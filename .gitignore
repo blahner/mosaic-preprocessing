@@ -1,3 +1,14 @@
+# images
+*.png 
+*.svg
+*.eps
+
+# numpy files
+*.npy
+
+# models
+src/stimulusSetPreparation/visualizations/models/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
