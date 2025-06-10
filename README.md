@@ -1,5 +1,8 @@
 # mosaic-preprocessing
-This repository demonstrates how to preprocess a raw BIDS-compatible fMRI dataset (e.g., OpenNeuro) into MOSAIC-compatible fMRI-stimulus pairs. Data are preprocessed into one hdf5 file per subject. All datasets that get added to MOSAIC must be accompanied by a public GitHub repository that details its preprocessing, like this repository. This repository details the preprocessing for the following datasets:
+This repository serves two purposes: (1) release the code used to preprocess the eight datasets used in the original MOSAIC publication and (2) walk-through on how others can preprocess their fMRI dataset to add to MOSAIC. A public GitHub repository that includes preprocessing scripts, like this one, is required to make your fMRI dataset MOSAIC compatible.
+
+## MOSAIC preprocessing
+This repository details the preprocessing for the following datasets:
 
 - [BOLD5000](https://openneuro.org/datasets/ds001499)
 - [BOLD Moments Dataset (BMD)](https://openneuro.org/datasets/ds005165)
@@ -10,6 +13,10 @@ This repository demonstrates how to preprocess a raw BIDS-compatible fMRI datase
 - [THINGS](https://openneuro.org/datasets/ds004192)
 - [Natural Object Dataset (NOD)](https://openneuro.org/datasets/ds004496)
 - [Natural Scenes Dataset (NSD)](https://registry.opendata.aws/nsd/)
+
+### Validation
+- [fMRIPrep reports](https://drive.google.com/drive/folders/1HM_YeygB6IgxbGx_IalKFN66slG4Lxmo?usp=sharing)
+- Noise ceiling estimation
 
 ### Create environment
 ```
@@ -23,6 +30,92 @@ Set up your .env file
 ```
 cp .env.example .env
 ```
+
+### MOSAIC preprocessing
+MOSAIC preprocessing can be divided in two stages: fMRI and stimulus set. Here we describe the preprocessing for the initial set of 8 datasets in the MOSAIC manuscript. If you want to add a ninth dataset that is MOSAIC-compatible with the other eight, for example, follow this pipeline. Otherwise, feel free to preprocess datasets with other pipelines, recognizing that they will not be MOSAIC compatible with the initial eight.
+
+### Stimulus set
+For each fMRI dataset separately:
+
+1. (Optional) Define dataset-specific train-test splits if not already done. If a dataset already defines a train-test split in its original publication, we highly recommend using preserving this split. If a dataset does not define a train-test split and one is not defined elsewhere, define your own in such a way that each subject has a train-test split. Sometimes this procedure requires additional code with file artifacts (see NOD) and other times it does not (see HAD).
+
+2. Extract detailed stimulus information into a .tsv file. Required columns are
+    - filename (original filename of the stimulus)
+    - alias (different filename that is dataset-specific)
+    - source (original stimulus source, e.g., ImageNet)
+    - test_train (whether this stimulus is in the dataset's test or train split)
+    - sub-XX reps (how many times sub-XX viewed this stimulus. Each subject is its own columns)
+
+3. Download the dataset's stimulus set if not done so already.
+
+4. Extract [DreamSim](https://arxiv.org/abs/2306.09344) embeddings for each stimulus and save.
+
+MOSAIC emphasizes diligent data provenance. Especially as we train AI models on this data, we want to keep track of exactly which stimuli are used.
+
+### fMRI responses
+For each fMRI dataset separately:
+
+1. Download the raw data from the original publication. Organize in [BIDS](https://bids.neuroimaging.io/) format if not done so already.
+
+2. Preprocess the data using your pipeline of choice (here, [fMRIPrep](https://fmriprep.org/en/stable/) version 23.2.0). Make sure to keep all arguments the same across datasets, such as registration space, reference slice etc.
+
+3. Estimate single trial betas using a General Linear Model (here, using [GLMsingle](https://elifesciences.org/articles/77599) version 1.2). Again, make sure version is consistent across datasets.
+
+4. Normalize single-trial beta estimates by dataset-specific train-test splits. 
+
+5. Compute noise ceiling estimates per voxel using the method detailed in the Natural Scenes Dataset [manuscript](https://www.nature.com/articles/s41593-021-00962-x). 
+
+6. Compute NaN indices
+
+7. Compile fMRI data into one .hdf5 file for each subject individually. Verify the file is MOSAIC compliant (see 'how to make your MOSAIC upload MOSAIC compliant' below).
+
+Note that the .hdf5 files include all single trial beta estimates. Subsequent stimulus set filtering when you combine subjects/datasets into your MOSAIC will output train and test set .json files that will simply not reference stimuli and fMRI trials that get filtered out. But the .hdf5 files themselves are agnostic to this stimulus set filtering.
+
+### Upload data to the MOSAIC website
+For a fMRI dataset of n subjects, you will upload n+2 files:
+
+1. n .hdf5 files, one for each of the n subjects.
+2. One pickle file containing the DreamSim embeddings for each stimulus. 
+3. One .tsv file containing the detailed stimulus set information.
+
+Do not upload the stimuli themselves. Most stimulus sets have copyright restrictions with varying terms and conditions. MOSAIC does not have the rights to redistribute these stimulus sets, so please download them from the original source that should be detailed in the fMRI dataset's original publication. The DreamSim embeddings and .tsv files are enough for MOSAIC to identify train-test splits on the website's backend.
+
+### Download data from the MOSAIC website
+From the MOSAIC website you will select which datasets within a pipeline you want to download. You will download each subject's .hdf5 files, pickle file with DreamSim embeddings, and detailed stimulus set information .tsv file. See the website for most up-to-date instructions.
+
+### How to make a dataset MOSAIC compliant
+As explained above, your upload will consist of n+2 files for a fMRI dataset of n subjects.
+Each of the n .hdf5 files must follow the format:
+```
+|- sub-XX_mosaic.hdf5
+    |- dataset_name
+    |- subjectID
+    |- age
+    |- sex
+    |- visual_angle
+    |- owner_name
+    |- owner_email
+    |- pipeline
+    |- trial_format
+    |- github_repo_url
+    |- publication_url
+    |- betas
+        |- stimulus_filename_rep-R.npy
+        |- ...
+    |- noiseceling
+        |- noiseceiling_n-N.npy
+    |- nan_indices
+        |- sub-XX_nan_indices.npy
+```
+The first entries are type string. The betas and noiseceilings are type float of shape (91282,). The nan_indices are type bool of shape (91282,).
+
+The pickle file with the DreamSim embeddings are a dictionary in the form:
+```
+{'stimulus-<stimulus_filename>': DreamSim_embedding}
+```
+where DreamSim_embedding is type float of shape (1768,).
+
+The .tsv file with stimulus information must contain all the columns described above.
 
 ### Loading the fMRI responses
 All single-trial fMRI responses output from each individual dataset's GLM is stored in the hdf5 file 'mosaic_version_1_0_0.hdf5'.
