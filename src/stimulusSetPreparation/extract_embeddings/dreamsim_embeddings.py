@@ -13,6 +13,16 @@ import argparse
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
+"""
+This script extracts DreamSim embeddings from all stimuli in a common folder. This script
+supports '.jpg', '.JPG', '.JPEG', '.jpeg' image files and .mp4 video files. Other file extensions
+(e.g., .tif) may need to be converted to an acceptable file format due to what DreamSim accepts as
+input. For .mp4 video files, DreamSim embeddings are averaged over frames.
+
+You may want to extract DreamSim embeddings for stimuli in one dataset (e.g., for making test-train splits).
+In that case, edit filepaths and filenames.
+"""
+
 def main(args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
