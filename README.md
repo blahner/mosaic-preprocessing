@@ -138,6 +138,12 @@ src/fmriDatasetPreparation/datasets/<DATASET>/validation/noiseceiling_<DATASET>.
 INPUTS: noise ceiling npy files, beta estimates, subject information, GitHub repository url.
 OUTPUTS: .hdf5 file
 
+```
+python src/fmriDatasetPreparation/create_hdf5/create_hdf5.py --subjectID_dataset sub-XX_DATASET --owner_name "firstName lastName" --owner_email youremail@email.com
+
+python src/fmriDatasetPreparation/create_hdf5/create_hdf5.py --subjectID_dataset sub-01_NSD --owner_name "Benjamin Lahner" --owner_email blahner@mit.edu
+```
+
 Note that the .hdf5 files include all single trial beta estimates. Subsequent stimulus set filtering when you aggregate subjects/datasets into your MOSAIC dataset will output train and test set .json files that will simply not reference the stimuli and fMRI trials that get filtered out. But the .hdf5 files themselves are agnostic to this stimulus set filtering.
 
 ### Validation
