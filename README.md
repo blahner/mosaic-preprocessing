@@ -4,9 +4,9 @@
 <img src="https://github.com/blahner/mosaic-preprocessing/blob/main/assets/mosaic_logo.png" width="50%" alt="MOSAIC Logo">
 </p>
     
-This repository serves two purposes: (1) release the preprocessing code for the eight datasets used in the original MOSAIC publication and (2) provide a template repository for others to preprocess their fMRI dataset to MOSAIC. A public GitHub repository that includes all preprocessing scripts, like the first part of this repository, is required to make your fMRI dataset MOSAIC compliant.
+This repository serves two purposes: (1) share the preprocessing code for the eight datasets used in the original MOSAIC publication and (2) provide a template repository for others to preprocess their fMRI dataset to be MOSAIC-compliant. A public GitHub repository that includes all preprocessing scripts, like this repository, is required to make your fMRI dataset MOSAIC-compliant.
 
-## (1) MOSAIC preprocessing for the MOSAIC [manuscript](TODO)
+## MOSAIC preprocessing for the MOSAIC [manuscript](TODO)
 This repository details the preprocessing for the following datasets:
 
 - [BOLD5000](https://openneuro.org/datasets/ds001499)
@@ -43,8 +43,17 @@ I found it easiest to separate dataset-specific folders (e.g., like what you wou
 ├── MOSAIC/
 ```
 
+The central MOSAIC folder will look like:
+```
+/MOSAIC/
+├── stimuli/
+├── testtrain/
+├── hdf5/
+├── participants/
+```
+
 The path to the datasets should be set as an environment variable DATASET_ROOT.
-Your path to this repository will likely be in a different directory entirely and set as an environment variable PROJECT_ROOT.
+Your path to this repository will likely be in a different directory entirely and set as an environment variable PROJECT_ROOT. 'source' your .env file.
 
 ### MOSAIC preprocessing
 MOSAIC preprocessing can be divided in two stages: fMRI and stimulus set. Here we describe the preprocessing for the initial set of 8 datasets in the MOSAIC manuscript. If you want to add a ninth dataset that is MOSAIC-compatible with the other eight, for example, follow this pipeline. Otherwise, feel free to preprocess datasets with other pipelines, recognizing that they will not be MOSAIC compatible with the initial eight.
@@ -55,6 +64,7 @@ For each fMRI dataset separately:
 1. Extract [DreamSim](https://arxiv.org/abs/2306.09344) embeddings for each stimulus and save. Download the stimuli from the original fMRI dataset publication. MOSAIC does not directly provide the stimuli due to copyright.
 
 INPUTS: folder with stimuli
+
 OUTPUTS: pickle file with dictionary in format {'stimulus_filename': np.array((1768,))}. Keys are stimulus filenames (str), values are DreamSim vector embeddings (ndarray)
 
 ```
@@ -64,6 +74,7 @@ python src/stimulusSetPreparation/extract_embeddings/dreamsim_embeddings.py
 2. (Optional) Define dataset-specific train-test splits if not already done. If a dataset already defines a train-test split in its original publication, we highly recommend using preserving this split. If a dataset does not define a train-test split and one is not defined elsewhere, define your own in such a way that each subject has a non-overlapping train-test split. Sometimes this procedure requires additional code with file artifacts (see NOD below) and other times it does not (see HAD).
 
 INPUTS: DreamSim embedding pickle file (or can vary based on how you want to determine test/train split)
+
 OUTPUTS: pickle file containing list of stimuli in test and train splits (but can also vary based on your method).
 
 ```
@@ -79,6 +90,7 @@ python src/stimulusSetPreparation/extract_dataset_stiminfo/nod_testtrain_splits/
     - sub-XX reps (how many times sub-XX viewed this stimulus. Each subject is its own column)
 
 INPUTS: fMRI dataset downloaded in BIDS format
+
 OUTPUTS: .tsv file with stimulus information
 
 ```
@@ -93,6 +105,7 @@ For each fMRI dataset separately:
 1. Download the raw data from the original publication. Organize in [BIDS](https://bids.neuroimaging.io/) format if not done so already.
 
 INPUTS: None
+
 OUTPUTS: Folder with raw fMRI data in BIDS format.
 
 ```
@@ -102,6 +115,7 @@ bash src/fmriDatasetPreparation/datasets/<DATASET>/download/download_<DATASET>.s
 2. Preprocess the data using your pipeline of choice (here, [fMRIPrep](https://fmriprep.org/en/stable/) version 23.2.0). Make sure to keep all arguments the same across datasets, such as registration space, reference slice etc.
 
 INPUTS: Folder with raw fMRI data in BIDS format.
+
 OUTPUTS: fMRIPrep derivatives
 
 ```
@@ -111,6 +125,7 @@ bash src/fmriDatasetPreparation/datasets/<DATASET>/fmriprep/run_fmriprep_single.
 3. Estimate single trial betas using a General Linear Model (here, using [GLMsingle](https://elifesciences.org/articles/77599) version 1.2). Again, make sure version is consistent across datasets.
 
 INPUTS: fMRIPrep derivatives
+
 OUTPUTS: GLMsingle outputs of single trial beta estimates, pickle file of stimulus order corresponding to the beta estimates
 
 ```
@@ -120,6 +135,7 @@ python src/fmriDatasetPreparation/datasets/<DATASET>/GLM/glmsingle_<DATASET>.py
 4. Normalize single-trial beta estimates by dataset-specific train-test splits. This step uses the stimulus information .tsv file from "stimulus set preprocessing" step 3.
 
 INPUTS: GLMsingle outputs of single trial beta estimates, .tsv file from "stimulus set preprocessing" step 3
+
 OUTPUTS: train and test pickle files with normalized beta estimates. Each pickle file has tuple (betas, stimorder)
 
 ```
@@ -129,6 +145,7 @@ python src/fmriDatasetPreparation/datasets/<DATASET>/GLM/organize_betas_<DATASET
 5. Compute noise ceiling estimates per voxel using the method detailed in the Natural Scenes Dataset [manuscript](https://www.nature.com/articles/s41593-021-00962-x). 
 
 INPUTS: train and test pickle files with normalized beta estimates. 
+
 OUTPUTS: npy files of noise ceiling estimates per vertex. image of noise ceiling estimates on a flatmap (optional)
 
 Run the notebook located in:
@@ -141,6 +158,7 @@ src/fmriDatasetPreparation/datasets/<DATASET>/validation/noiseceiling_<DATASET>.
 7. Compile fMRI data into one .hdf5 file for each subject individually. Verify the file is MOSAIC compliant (see 'how to make your MOSAIC upload MOSAIC compliant' below).
 
 INPUTS: noise ceiling npy files, beta estimates, subject information, GitHub repository url.
+
 OUTPUTS: .hdf5 file
 
 ```
