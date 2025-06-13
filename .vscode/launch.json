@@ -16,6 +16,14 @@
                 "--owner_name", "BL",
                 "--owner_email", "@"
             ]
+        },
+        {
+            "name": "merge hdf5 files chunks",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/data/vision/torralba/selfmanaged/oliva/u/blahner/projects/mosaic-preprocessing/src/fmriDatasetPreparation/create_hdf5/merge_hdf5_chunks.py",
+            "console": "integratedTerminal",
+            "args": []
         }
     ]
 }

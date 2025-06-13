@@ -48,7 +48,7 @@ The central MOSAIC folder will look like:
 /MOSAIC/
 ├── stimuli/
 ├── testtrain/
-├── hdf5/
+├── hdf5_files/
 ├── participants/
 ```
 
@@ -136,7 +136,7 @@ python src/fmriDatasetPreparation/datasets/<DATASET>/GLM/glmsingle_<DATASET>.py
 
 INPUTS: GLMsingle outputs of single trial beta estimates, .tsv file from "stimulus set preprocessing" step 3
 
-OUTPUTS: train and test pickle files with normalized beta estimates. Each pickle file has tuple (betas, stimorder)
+OUTPUTS: train and test (and artificial) pickle files with normalized beta estimates. Each pickle file has tuple (betas, stimorder)
 
 ```
 python src/fmriDatasetPreparation/datasets/<DATASET>/GLM/organize_betas_<DATASET>.py
@@ -153,11 +153,9 @@ Run the notebook located in:
 src/fmriDatasetPreparation/datasets/<DATASET>/validation/noiseceiling_<DATASET>.ipynb
 ```
 
-6. Compute NaN indices (TODO)
+6. Compile fMRI data into one .hdf5 file for each subject individually. Verify the file is MOSAIC compliant (see 'how to make your MOSAIC upload MOSAIC compliant' below).
 
-7. Compile fMRI data into one .hdf5 file for each subject individually. Verify the file is MOSAIC compliant (see 'how to make your MOSAIC upload MOSAIC compliant' below).
-
-INPUTS: noise ceiling npy files, beta estimates, subject information, GitHub repository url.
+INPUTS: beta estimate pickle files from step 4, noise ceiling npy files from step 5, subject information, GitHub repository url.
 
 OUTPUTS: .hdf5 file
 
@@ -174,9 +172,7 @@ Finally, share some preprocessing validation reports. We recommend sharing fMRIP
 - [fMRIPrep reports](https://drive.google.com/drive/folders/1HM_YeygB6IgxbGx_IalKFN66slG4Lxmo?usp=sharing)
 - [Noise ceiling estimates](TODO)
 
-## Instructions to upload your dataset to MOSAIC website
-
-### Upload data to the MOSAIC website
+### Upload single subject hdf5 files to the MOSAIC website
 For a fMRI dataset of n subjects, you will upload n+2 files:
 
 1. n .hdf5 files, one for each of the n subjects.
@@ -184,6 +180,33 @@ For a fMRI dataset of n subjects, you will upload n+2 files:
 3. One .tsv file containing the detailed stimulus set information.
 
 Do not upload the stimuli themselves. Most stimulus sets have copyright restrictions with varying terms and conditions. MOSAIC does not have the rights to redistribute these stimulus sets, so please download them from the original source that should be detailed in the fMRI dataset's original publication. The DreamSim embeddings and .tsv files are enough for MOSAIC to identify train-test splits on the website's backend.
+
+## Merging hdf5 files into a MOSAIC
+At this step, you have either preprocessed your own datsets into single subject .hdf5 files, or you have downloaded single subject .hdf5 files 
+from the MOSAIC data management portal. While you don't have to merge them, merging them into a single .hdf5 file is helpful for many analyses,
+like model training.
+
+I found it helpful to have two copies of MOSAIC data - one for experiments that access individual trials (like model training) and one for experiments
+that access data in chunks/batches (like loading all subject data at once). I show how to do both. Either one will work for any case, but depending
+on the access patterns you expect to use, one will just be faster. 
+
+Assuming the single subject hdf5 files are in /your/path/to/datasets/MOSAIC/hdf5_files/single_subject
+
+For random access:
+```
+python src/fmriDatasetPreparation/create_hdf5/merge_hdf5_ind.py --input_dir /your/path/to/datasets/MOSAIC/hdf5_files/single_subject ---output_dir /your/path/to/datasets/MOSAIC/hdf5_files/merged --output_file mosaic_ind.hdf5
+```
+
+For chunks:
+```
+python src/fmriDatasetPreparation/create_hdf5/merge_hdf5_chunks.py --input_dir /your/path/to/datasets/MOSAIC/hdf5_files/single_subject ---output_dir /your/path/to/datasets/MOSAIC/hdf5_files/merged --output_file mosaic_chunks.hdf5
+```
+
+## Why hdf5 files?
+The hdf5 hierarchical [format](https://docs.h5py.org/en/stable/quick.html) is a very handy way of managing large amounts of data. Most useful is the property that you can load a subset of a vector into memory. For example, we store the full 91282 vertices from the whole brain but often times only want to laod and analyze a few hundred or thousand vertices corresponding to an ROI. HDF5 files allow you to load that small subset into memory without loading the full response vector, resulting in significant computational savings.
+
+Additionally, hdf5 files handle concurrent reads nicely for multi-thread processing and allow you to store metadata ('attributes') right next to the data. A single file with
+all the data, although large, is much easier to organize and share than hundreds of thousands of individual files.
 
 ### How to make a dataset MOSAIC compliant
 As explained above, your upload will consist of n+2 files for a fMRI dataset of n subjects.

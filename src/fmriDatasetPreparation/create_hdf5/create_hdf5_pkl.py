@@ -18,7 +18,10 @@ project_root = os.getenv("PROJECT_ROOT")
 def main(args):
     # Create a file
     print(f"starting hdf5 file creation for {args.subjectID_dataset}...")
-    with h5py.File(os.path.join(args.root, "MOSAIC", 'hdf5_files', f'{args.subjectID_dataset}.hdf5'), 'w') as grp:
+    hdf5_dir = os.path.join(args.root, "MOSAIC", 'hdf5_files', 'single_subject')
+    if not os.path.exists(hdf5_dir):
+        os.makedirs(hdf5_dir)
+    with h5py.File(os.path.join(hdf5_dir, f'{args.subjectID_dataset}.hdf5'), 'w') as grp:
         subjectID, fmri_dataset_name = args.subjectID_dataset.split('_')
         #First add attributes
         grp.attrs.create("visual_angle", args.visual_angle)
