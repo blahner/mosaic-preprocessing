@@ -1,0 +1,21 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "create hdf5 file with pkl",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/data/vision/torralba/selfmanaged/oliva/u/blahner/projects/mosaic-preprocessing/src/fmriDatasetPreparation/create_hdf5/create_hdf5_pkl.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--subjectID_dataset", "sub-01_BMD",
+                "--owner_name", "BL",
+                "--owner_email", "@"
+            ]
+        }
+    ]
+}

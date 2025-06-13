@@ -22,9 +22,9 @@ The steps are preprocessing stimulus set, fMRI data, and validation. The goal of
 First, create an environment.
 
 ```
-conda create -n MOSAIC python=3.11
-conda activate MOSAIC
-cd /your/path/to/MOSAIC
+conda create -n mosaic-preprocessing python=3.11
+conda activate mosaic-preprocessing
+cd /your/path/to/mosaic-preprocessing
 pip install -r requirements.txt
 ```
 
