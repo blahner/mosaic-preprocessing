@@ -1,11 +1,11 @@
 set -e
 #make sure you source your .env file before sourcing this script to access the necessary environment variables
 ROOT="${PROJECT_ROOT}/src/fmriDatasetPreparation/datasets/BOLD5000/GLM"
-for subj in {2..4}; do
+for subj in {1..4}; do
 echo "Starting glm estimation for sub-${subj}"
     for sesgroup in {1..3}; do
     echo "Running GLMsingle"
-    python3 ${ROOT}/glmsingle_b5000_combine_sessions.py -s ${subj} -i ${sesgroup} -v
+    python3 ${ROOT}/glmsingle_b5000.py -s ${subj} -i ${sesgroup} -v
     done
     echo "Finished subject ${subj}"
 done

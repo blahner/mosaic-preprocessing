@@ -28,6 +28,12 @@ cd /your/path/to/mosaic-preprocessing
 pip install -r requirements.txt
 ```
 
+Install [GLMsingle](https://github.com/cvnlab/GLMsingle)
+```
+pip install git+https://github.com/cvnlab/GLMsingle.git
+conda list glmsingle #check glmsingle version (1.2 for initial release of MOSAIC)
+```
+
 Set up your .env file
 ```
 cp .env.example .env
@@ -36,7 +42,7 @@ The .env file defines paths to your project directory, datasets, tmp directories
 
 I found it easiest to separate dataset-specific folders (e.g., like what you would download from OpenNeuro) from an aggregated MOSAIC dataset folder like:
 ```
-/datasets/
+./datasets/
 ├── <fMRI DATASET A>/
 ├── <fMRI DATASET B>/
 ├── <fMRI DATASET Z>/
@@ -45,7 +51,7 @@ I found it easiest to separate dataset-specific folders (e.g., like what you wou
 
 The central MOSAIC folder will look like:
 ```
-/MOSAIC/
+./datasets/MOSAIC/
 ├── stimuli/
 ├── testtrain/
 ├── hdf5_files/
@@ -60,6 +66,14 @@ MOSAIC preprocessing can be divided in two stages: fMRI and stimulus set. Here w
 
 ### Stimulus set preprocessing
 For each fMRI dataset separately:
+
+1. Download the stimuli from the original fMRI dataset publication. Unfortunately, we do not have permission to redistribute copyrighted material. We provide stimulus download scripts for some of the datasets, but otherwise visit the dataset links above and follow their download instructions.
+
+Input: None
+
+Output: stimulus set downloaded in each dataset-specific folder.
+
+2. Move all stimuli into MOSAIC stimulus folder. Here, the order you move the stimuli into this folder might matter if the stimuli share the same filename.  
 
 1. Extract [DreamSim](https://arxiv.org/abs/2306.09344) embeddings for each stimulus and save. Download the stimuli from the original fMRI dataset publication. MOSAIC does not directly provide the stimuli due to copyright.
 

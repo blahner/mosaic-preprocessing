@@ -1,24 +1,25 @@
 set -e
-export NII=/data/vision/oliva/scratch/datasets/HumanActionsDataset
-export TMP=/data/vision/oliva/scratch/blahner
-export WORK=$TMP/tmp/HAD-workdir
-export FMRIPREP_VERSION="23.2.0"
-export USERNAME=blahner
 
-su $USERNAME -c "mkdir -p $NII/derivatives"
-su $USERNAME -c "mkdir -p $WORK"
+#make sure you source your .env file before sourcing this script to access the necessary environment variables
+export ROOT="${DATASETS_ROOT}/HumanActionsDataset"
+export OUTPUT_RELPATH=/derivatives
+export WORK=${TMP}/tmp/HAD-workdir
+export FMRIPREP_VERSION="23.2.0"
+echo "${DATASETS_ROOT}" 
+mkdir -p ${WORK}
+mkdir -p "${ROOT}/${OUTPUT_RELPATH}"
 
 nthreads=4
 ncpus=16
 docker pull nipreps/fmriprep:${FMRIPREP_VERSION}
 
-for subj in {02..30}; do
+for subj in {01..30}; do
     echo "Starting fMRIPrep for sub-${subj}"
     docker run \
-    --user 24591:20681 \
+    --user $(id -u):$(id -g) \
     -it --rm \
-    -v $NII/Nifti:/data:ro \
-    -v $NII/derivatives:/out \
+    -v $ROOT/Nifti:/data:ro \
+    -v "${ROOT}/${OUTPUT_RELPATH}/fmriprep":/out \
     -v $WORK:/work \
     -v $FREESURFER_HOME/license.txt:/opt/freesurfer_license/license.txt \
     \

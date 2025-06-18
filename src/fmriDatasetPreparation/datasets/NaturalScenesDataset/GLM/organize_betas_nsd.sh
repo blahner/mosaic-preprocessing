@@ -4,7 +4,7 @@ ROOT=${PROJECT_ROOT}/src/fmriDatasetPreparation/datasets/NaturalScenesDataset/GL
 for subj in {01..08}; do
 echo "Starting glm estimation for sub-${subj}"
     echo "organizing betas"
-    python3 ${ROOT}/nsd_organize_betas_testtrain.py -s ${subj}
+    python3 ${ROOT}/organize_betas_nsd.py -s ${subj}
     echo "Finished subject ${subj}"
 done
 echo "Finished training GLM for all subjects in the loop"

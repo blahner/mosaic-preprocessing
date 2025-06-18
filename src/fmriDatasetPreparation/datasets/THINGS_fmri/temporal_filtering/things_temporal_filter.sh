@@ -8,4 +8,4 @@ for subj in {01..03}; do
     python3 ${ROOT}/things_temporal_filter.py -s ${subj} -t 'pRF'
     echo "Finished subject ${subj}"
 done
-echo "Finished training GLM for all subjects in the loop"
+echo "Finished temporal filtering for all subjects in the loop"

@@ -3,6 +3,6 @@ set -e
 ROOT="${PROJECT_ROOT}/src/fmriDatasetPreparation/datasets/GenericObjectDecoding/GLM"
 for sub in {01..05}; do
     echo "Starting glm estimation for sub-${sub}"
-    python3 ${ROOT}/glmsingle_god_combine_sessions.py -s $sub -v
+    python3 ${ROOT}/glmsingle_god.py -s $sub -v
     echo "Finished subject ${sub}"
 done

@@ -12,7 +12,7 @@ import random
 from typing import Union, List, Tuple
 from numpy.typing import NDArray
 import warnings
-
+from collections import defaultdict
 
 dataset_root = os.path.join(os.getenv("DATASETS_ROOT"), "MOSAIC")
 
@@ -215,6 +215,157 @@ def interpolate_ts(fmri, tr_acq, tr_resamp):
     return fmri_interp
 
 class ComputeNoiseceiling:
+    """
+    Class to compute the noise ceiling for beta estimates with varying repetitions across stimuli.
+    
+    Briefly, this function estimates the noise ceiling by:
+    1. Compute noise variance (across repeated trials)
+    2. Compute total variance (across all stimulus trials)
+    3. Compute signal variance (total variance - noise variance)
+    4. NCSNR is ratio of signal to noise std
+    5. noiseceiling is NCNSR^2/(NCSNR^2+avg_term) where the avergage term modulates
+        the noiseceiling by how many trials would be averaged for an estimation.
+
+    The input betas matrix can contain stimuli of differing number of repetitions. In other words,
+    some stimuli may have 3 repetitions, some may have 10, others 1 etc. In this case,
+    the matrix should be of shape (vertices, max_reps, num_stimuli) where stimuli
+    not repeated max_reps number of times will be padded with vectors of nans.
+    In order to calculate a noiseceiling for a vertex using stimuli of varying number of repetitions,
+    the noise variance is pooled across the repetitions for each stimulus.
+    The final noiseceiling calculation accounts for the varying number of averaged trials using the term
+    [(A/a + B/b + C/c)/(A + B + C)] etc. where A, B, and C are the number of stimuli and a, b and c are the 
+    number of repetitions for those stimuli. 
+    Parameters:
+    -----------
+    betas : NDArray
+        Beta estimates with shape (vertices, num_reps, num_stimuli)
+        Stimuli with fewer than max_reps repetitions should have NaN values
+    n : Union[int, str], default='avg'
+        Number of trials for noise ceiling computation:
+        - 'avg': Estimates assuming responses are averaged over all available reps
+        - int > 0: Requires exactly n repetitions for all stimuli
+
+    Code adapted from GLMsingle example: https://github.com/cvnlab/GLMsingle/blob/main/examples/example9_noiseceiling.ipynb
+    See NSD data manual page for derivation: https://cvnlab.slite.page/p/6CusMRYfk0/Functional-data-NSD 
+    Also see: https://github.com/gifale95/NSD-synthetic/blob/main/00_prepare_fmri/prepare_nsdsynthetic_fmri.py#L83
+    and https://github.com/gifale95/NSD-synthetic/blob/main/paper_figure_4/04_test_encoding_models.py#L137
+    """
+    def __init__(self, betas: NDArray, n: Union[int, str] = 'avg'):
+        # Input validation
+        if not isinstance(betas, np.ndarray) or len(betas.shape) != 3:
+            raise ValueError("betas must be a 3D numpy array")
+        if betas.shape[0] != 91282:
+            warnings.warn(f"Your number of vertices is {betas.shape[0]}. If you are in fsLR32k space using all vertices, the value should be 91282. Double check the shape is correct.")
+        if isinstance(n, int) and n < 1:
+            raise ValueError("n must be >= 1")
+        if isinstance(n, str) and n != 'avg':
+            raise ValueError(f"If n is a string, it must be 'avg', not {n}")
+        
+        self.betas = betas
+        self.n = n
+        self.num_vertices, _, self.num_stimuli = self.betas.shape
+
+    def compute_noiseceiling(self):
+        """
+        Compute the ncsnr and noiseceiling for each vertex when your data has differing number of repetitions for different stimuli.
+        In other words, stimuli A might be presented a times, stimuli B might be presented b times, etc. This function pools the noise variance
+        across the stimuli weighting by the number of repetitions for that stimulus (via degrees of freedom).
+        This function is a generalized case of "compute_noiseceiling_equalreps()" where the number of repetitions per stimulus deos not
+        need to be equal. Thus, you can still specifiy n as an integer, but you can also more generally specify n as "avg" to compute
+        the noiseceiling when each stimulus is averaged over all reps, whatever the number of reps may be.
+
+        Returns:
+        ncsnr: ndarray, noise ceiling snr as ratio of standard deviation of signal to noise for each vertex.
+        noiseceiling: ndarray, percent explainable variance at each vertex expressed between 0 and 100.        
+        """
+
+        num_var = np.zeros((self.num_vertices,)) #numerator
+        den_var = np.zeros((self.num_vertices,)) #denominator
+        all_betas_list = [] #keep track of all non-nan betas
+        stim_counts = defaultdict(int) #keep track of how many stimuli were repeating how many times {nrepreats: nstimuli}
+        for idx in range(0,self.num_stimuli):
+            betas_stim_tmp = self.betas[:,:,idx] #betas just for that stimuli
+            #remove nan vectors
+            betas_stim_list = []
+            nrepeats = 0
+            for i in range(betas_stim_tmp.shape[1]):
+                rep = betas_stim_tmp[:,i]
+                if np.all(np.isnan(rep)):
+                    continue #disregard nan vectors, used as placeholders if number of repeats was not the same
+                else:
+                    nrepeats += 1
+                    betas_stim_list.append(rep)
+                    all_betas_list.append(rep)
+            stim_counts[nrepeats] += 1 #another stimuli was repeated nrepeats times
+
+            betas_stim = np.vstack(betas_stim_list) #array shape (numreps, numvertices)
+            if betas_stim.shape[0] > 1: #only count variance of stimuli greater than one. otherwise can run into nans when computing variance across 1 rep
+                num_var += np.var(betas_stim, axis=0, ddof=1) * (betas_stim.shape[0] - 1) #variane over trials for the stimuli multiplied by dof (num reps - 1)
+                den_var += betas_stim.shape[0] - 1
+
+        if len(stim_counts) == 1 and list(stim_counts.keys())[0] <= 1:
+            raise ValueError("Cannot estimate noiseceiling with only one repetition")
+        if isinstance(self.n, int) and self.n > 1:
+            if stim_counts[self.n] != self.num_stimuli:
+                raise ValueError(
+                    f"Specifying n={self.n} requires all stimuli to have {self.n} repetitions. "
+                    f"Current repetition counts: {list(stim_counts.keys())}. Use n='avg' for varying reps."
+                )
+        noise_var = num_var/den_var #pooled
+        
+        all_betas = np.vstack(all_betas_list) #shape (numtrials, numvertices)
+        total_var = np.var(all_betas, axis=0, ddof=1) #use ddof=1 for unbiased estimation
+        signal_var = total_var - noise_var
+        signal_var[signal_var<0] = 0
+        ncsnr = np.sqrt(signal_var) / np.sqrt(noise_var)
+
+        #calculate norm term
+        if self.n == 'avg':
+            #norm_term = sum(ns/(i+1) for i, ns in enumerate(self.n_avg)) / sum(self.n_avg)
+            norm_term = sum(numstim/nrepeats for nrepeats, numstim in stim_counts.items()) / sum(stim_counts.values())
+        else:
+            norm_term = 1/self.n
+            
+        #calculate final noise ceiling
+        noiseceiling = 100 * (ncsnr**2 / (ncsnr**2 + norm_term))
+        
+        return ncsnr, noiseceiling
+    
+    def compute_noiseceiling_equalreps(self):
+        """
+        Implementation close to GLMsingle example for computing a noise ceiling with a fixed n. In other words,
+        if your beta matrix has some stimuli with more reps than others, do not use this function.
+        This function is a specific case of "compute_noiseceiling()" where all stimuli have the same number of 
+        repetitions. n must be an integer, and n="avg" is not allowed.
+
+        Returns:
+        ncsnr: noise-ceiling SNR at each vertex as ratio between signal std and noise std
+        noiseceiling: noise ceiling at each voxel vertex as % of explainable variance 
+        Code adapted from GLMsingle example: https://github.com/cvnlab/GLMsingle/blob/main/examples/example9_noiseceiling.ipynb
+        """
+        assert(len(self.betas.shape) == 3)
+        assert isinstance(self.n, int), f"Your n is {self.n}. To use this function, n must be an integer >= 1."
+        assert self.n >= 1, f"Your n is {self.n}. To use this function, n must be an integer >= 1." #can't specify 'avg' here.
+        numvertices = self.betas.shape[0]
+        num_reps = self.betas.shape[1]
+        num_vids = self.betas.shape[2]
+        noisesd = np.sqrt(np.mean(np.power(np.std(self.betas,axis=1,keepdims=1,ddof=1),2),axis=2)).reshape((numvertices,)) #np.sqrt(np.mean(np.var(betas,axis=1,ddof=1))).reshape((numvertices,)) #
+        noisevar = np.power(noisesd,2)
+        # Calculate the total variance of the single-trial betas.
+        totalvar = np.power(np.std(np.reshape(self.betas, (numvertices , num_reps*num_vids)), ddof=1, axis=1),2) #use ddof=1 for unbiased estimation
+
+        # Estimate the signal variance and positively rectify.
+        signalvar = totalvar - noisevar
+
+        signalvar[signalvar < 0] = 0
+        # Compute ncsnr as the ratio between signal standard deviation and noise standard deviation.
+        ncsnr = np.sqrt(signalvar) / noisesd
+
+        # Compute noise ceiling in units of percentage of explainable variance
+        noiseceiling = 100 * (np.power(ncsnr,2) / (np.power(ncsnr,2) + 1/self.n))
+        return ncsnr, noiseceiling
+
+class ComputeNoiseceiling_old:
     def __init__(self, betas: NDArray, n: Union[int, str] = 'avg'):
         """
         Class to compute the noise ceiling for beta estimates with varying repetitions across stimuli.
@@ -441,10 +592,10 @@ class ComputeNoiseceiling:
         numvertices = betas.shape[0]
         num_reps = betas.shape[1]
         num_vids = betas.shape[2]
-        noisesd = np.sqrt(np.mean(np.power(np.std(betas,axis=1,keepdims=1,ddof=1),2),axis=2)).reshape((numvertices,))
+        noisesd = np.sqrt(np.mean(np.power(np.std(betas,axis=1,keepdims=1,ddof=1),2),axis=2)).reshape((numvertices,)) #np.sqrt(np.mean(np.var(betas,axis=1,ddof=1))).reshape((numvertices,)) #
         noisevar = np.power(noisesd,2)
         # Calculate the total variance of the single-trial betas.
-        totalvar = np.power(np.std(np.reshape(betas, (numvertices , num_reps*num_vids)), axis=1),2)
+        totalvar = np.power(np.std(np.reshape(betas, (numvertices , num_reps*num_vids)), ddof=1, axis=1),2) #use ddof=1 for unbiased estimation
 
         # Estimate the signal variance and positively rectify.
         signalvar = totalvar - noisevar
@@ -455,7 +606,67 @@ class ComputeNoiseceiling:
 
         # Compute noise ceiling in units of percentage of explainable variance
         noiseceiling = 100 * (np.power(ncsnr,2) / (np.power(ncsnr,2) + 1/n))
-        return ncsnr, noiseceiling, totalvar, noisevar
+        return ncsnr, noiseceiling
+    
+    def _compute_nsdsynthetic_ncsnr_noiseceiling(self):
+        """
+        Adapted from NSDsynthetic paper: https://github.com/gifale95/NSD-synthetic/blob/9d9fd6e54e45c1d786fd2c0fa8b88411a76d9d71/00_prepare_fmri/prepare_nsdsynthetic_fmri.py#L83
+        
+        """
+        #self.betas is shape (nvertices, nreps, nstimuli)
+        #nsdsynthetic code betas are shape (ntrials, nvertices)
+
+        num_var = np.zeros((self.num_vertices,)) #numerator
+        den_var = np.zeros((self.num_vertices,)) #denominator
+        all_betas_list = [] #keep track of all non-nan betas
+        stim_counts = defaultdict(int) #keep track of how many stimuli were repeating how many times {nrepreats: nstimuli}
+        for idx in range(0,self.num_stimuli):
+            betas_stim_tmp = self.betas[:,:,idx] #betas just for that stimuli
+            #remove nan vectors
+            betas_stim_list = []
+            nrepeats = 0
+            for i in range(betas_stim_tmp.shape[1]):
+                rep = betas_stim_tmp[:,i]
+                if np.all(np.isnan(rep)):
+                    continue #disregard nan vectors, used as placeholders if number of repeats was not the same
+                else:
+                    nrepeats += 1
+                    betas_stim_list.append(rep)
+                    all_betas_list.append(rep)
+            stim_counts[nrepeats] += 1 #another stimuli was repeated nrepeats times
+
+            betas_stim = np.vstack(betas_stim_list) #array shape (numreps, numvertices)
+            if betas_stim.shape[0] > 1: #only count variance of stimuli greater than one. otherwise can run into nans when computing variance across 1 rep
+                num_var += np.var(betas_stim, axis=0, ddof=1) * (betas_stim.shape[0] - 1) #variane over trials for the stimuli multiplied by dof (num reps - 1)
+                den_var += betas_stim.shape[0] - 1
+
+        if len(stim_counts) == 1 and list(stim_counts.keys())[0] <= 1:
+            raise ValueError("Cannot estimate noiseceiling with only one repetition")
+        if isinstance(self.n, int) and self.n > 1:
+            if stim_counts[self.n] != self.num_stimuli:
+                raise ValueError(
+                    f"Specifying n={self.n} requires all stimuli to have {self.n} repetitions. "
+                    f"Current repetition counts: {list(stim_counts.keys())}. Use n='avg' for varying reps."
+                )
+        noise_var = num_var/den_var #pooled
+        
+        all_betas = np.vstack(all_betas_list) #shape (numtrials, numvertices)
+        total_var = np.var(all_betas, axis=0, ddof=1) #use ddof=1 for unbiased estimation
+        signal_var = total_var - noise_var
+        signal_var[signal_var<0] = 0
+        ncsnr = np.sqrt(signal_var) / np.sqrt(noise_var)
+
+        #calculate norm term
+        if self.n == 'avg':
+            #norm_term = sum(ns/(i+1) for i, ns in enumerate(self.n_avg)) / sum(self.n_avg)
+            norm_term = sum(numstim/nrepeats for nrepeats, numstim in stim_counts.items()) / sum(stim_counts.values())
+        else:
+            norm_term = 1/self.n
+            
+        #calculate final noise ceiling
+        noiseceiling = 100 * (ncsnr**2 / (ncsnr**2 + norm_term))
+        
+        return ncsnr, noiseceiling
 
     def _limit_true_values(self, arr: NDArray, reps: int) -> NDArray:
         """

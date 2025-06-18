@@ -12,7 +12,7 @@ nthreads=8
 ncpus=16
 docker pull nipreps/fmriprep:${FMRIPREP_VERSION}
 
-for subj in {02..08}; do
+for subj in {01..08}; do
     echo "Starting fMRIPrep for sub-${subj}"
     docker run \
         --user $(id -u):$(id -g) \

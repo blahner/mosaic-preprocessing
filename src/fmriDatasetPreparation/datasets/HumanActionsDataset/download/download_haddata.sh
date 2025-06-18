@@ -1,5 +1,7 @@
 set -e
-LOCAL_DIR=${DATASETS_ROOT}/HumanActionsDataset_new/
+# downloading HAD using the "ds004488-1.1.1_noderivatives.sh" script worked best because some updates to the dataset weren't reflected in the s3 bucket
+
+LOCAL_DIR=${DATASETS_ROOT}/HumanActionsDataset/
 echo $LOCAL_DIR
 aws s3 sync --no-sign-request s3://openneuro.org/ds004488 ${LOCAL_DIR}
 

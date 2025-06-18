@@ -4,7 +4,7 @@ import os
 import pandas as pd
 """
 Create events.tsv files in BIDS format for NSDsynthetic as they are not immediately available. Files created from 
-the "design_nsdsynthetic_runXX.tsv"
+the "design_nsdsynthetic_runXX.tsv". The official event files have since been made available - use those, not this scirpt.
 """
 def ceildiv(a, b):
     return -(a // -b)

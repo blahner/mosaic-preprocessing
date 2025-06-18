@@ -5,7 +5,7 @@ for subj in {01..03}; do
 echo "Starting glm estimation for sub-${subj}"
     for sesgroup in {1..2}; do
     echo "Running GLMsingle"
-    python3 ${ROOT}/glmsingle_things_combined_sessions.py -s ${subj} -i ${sesgroup} -v
+    python3 ${ROOT}/glmsingle_things.py -s ${subj} -i ${sesgroup} -v
     done
 echo "Finished subject ${subj}"
 done

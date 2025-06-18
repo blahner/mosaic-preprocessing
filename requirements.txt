@@ -1,7 +1,11 @@
 h5py
 hcp_utils
+ipykernel
+matplotlib
+nilearn
 numpy==1.26.4
 pandas
 python-dotenv
 scipy
+torch
 tqdm

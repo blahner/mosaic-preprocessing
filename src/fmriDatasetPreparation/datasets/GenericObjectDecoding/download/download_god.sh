@@ -9,6 +9,7 @@ dataset_files=("dataset_description.json"
     "task-imagery_bold.json"
     "task-perception_bold.json")
 
+mdkir ${LOCAL_DIR}/Nifti
 for f in "${dataset_files[@]}"; do
     aws s3 cp --no-sign-request s3://openneuro.org/ds001246/${f} \
     ${LOCAL_DIR}/Nifti/
