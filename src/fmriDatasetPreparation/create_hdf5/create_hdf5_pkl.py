@@ -91,6 +91,8 @@ def main(args):
                 fmri_root = os.path.join(args.root, args.dataset_name, "derivatives", "GLM", subjectID_original, "prepared_betas")
             beta_file = os.path.join(fmri_root, f"{subjectID_original}_organized_betas_task-{task}_normalized.pkl")
             if not os.path.isfile(beta_file):
+                if task == 'test' or task == 'train':
+                    raise ValueError(f"Could not find {task} betas.")
                 continue #skips cases where there is no artificial split
             else:
                 with open(beta_file, 'rb') as f:
@@ -124,7 +126,7 @@ def main(args):
                     dset.attrs.create('repetition', rep)
                     dset.attrs.create('presented_stimulus_filename', Path(stimorder[stim]).name)
         #add all nan_indices
-        grp.attrs.create('nan_indices_all', np.array(nan_indices_all)) #these nan indices are not ordered
+        grp.attrs.create('nan_indices_all', np.array(list(nan_indices_all))) #these nan indices are not ordered
 
 if __name__=='__main__':
     root_default = os.getenv("DATASETS_ROOT", "/default/path/to/datasets") #use default if DATASETS_ROOT env variable is not set.

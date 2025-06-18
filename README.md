@@ -67,7 +67,15 @@ MOSAIC preprocessing can be divided in two stages: fMRI and stimulus set. Here w
 ### Stimulus set preprocessing
 For each fMRI dataset separately:
 
-1. Download the stimuli from the original fMRI dataset publication. Unfortunately, we do not have permission to redistribute copyrighted material. We provide stimulus download scripts for some of the datasets, but otherwise visit the dataset links above and follow their download instructions.
+1. Download the stimuli from the original fMRI dataset publication. Since it is common for stimulus sets to not be under a Creative Commons license, we do not host or distribute any stimulus sets. Please download the stimulus sets following the instructions of the original publication. We provide download scripts when possible or else point you to the download instructions below:
+
+- BOLD5000: https://bold5000-dataset.github.io/website/download.html
+- BOLD Moments Dataset (BMD): https://github.com/blahner/BOLDMomentsDataset
+- Generic Object Decoding (GOD) and Deeprecon (same stimulus set): https://github.com/KamitaniLab/GenericObjectDecoding and https://github.com/KamitaniLab/DeepImageReconstruction
+- Human Actions Dataset (HAD): https://openneuro.org/datasets/ds004488 and/or the script "src/fmriDatasetPreparation/datasets/HumanActionsDataset/download/ds004488-1.1.1_noderivatives.sh"
+- THINGS: Download all THINGS database images https://osf.io/jum2f/. Then this notebook copies the ones used in the fMRI study to other folder: "src/fmriDatasetPreparation/datasets/THINGS_fmri/download/identify_experimental_stimuli.ipynb". Alternatively, we provide a txt file of the list of 8740 stimuli "THINGS_fmri_filenames.txt" in case you don't want to download THINGS event files etc.
+- Natural Object Dataset (NOD): https://openneuro.org/datasets/ds004496 and/or the script "src/fmriDatasetPreparation/datasets/NaturalObjectDataset/download/download_nod_stimuli.sh"
+- Natural Scenes Dataset (NSD): https://natural-scenes-dataset.s3.amazonaws.com/index.html#nsddata_stimuli/stimuli/ 
 
 Input: None
 

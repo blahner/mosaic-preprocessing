@@ -44,7 +44,7 @@ def aggregate_hdf5_files(input_dir, output_filepath):
             
             # Open the individual file
             with h5py.File(hdf5_file, 'r') as input_h5:
-                nan_indices_all.update(input_h5['nan_indices_all'])
+                nan_indices_all.update(input_h5.attrs['nan_indices_all'])
 
                 # Create a group for this subject in the output file
                 subject_group = output_h5.create_group(subject_group_name, track_order=True)
@@ -133,7 +133,7 @@ def aggregate_hdf5_files(input_dir, output_filepath):
                     noiseceilings_group = subject_group.create_group("noiseceilings", track_order=True)
                     copy_group_recursive(input_h5['noiseceilings'], noiseceilings_group)
 
-        output_h5.attrs.create('nan_indices_all', np.array(nan_indices_all)) #these nan indices are not ordered
+        output_h5.attrs.create('nan_indices_all', np.array(list(nan_indices_all))) #these nan indices are not ordered
 
 
     print(f"Successfully aggregated {len(hdf5_files)} files into {output_filepath}")
@@ -160,6 +160,8 @@ if __name__ == "__main__":
                        help="Output filename for aggregated HDF5 file")
     
     args = parser.parse_args()
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
 
     output_filepath = os.path.join(args.output_dir, args.output_file)
     

@@ -44,7 +44,7 @@ def aggregate_hdf5_files(input_dir, output_filepath):
             
             # Open the individual file
             with h5py.File(hdf5_file, 'r') as input_h5:
-                nan_indices_all.update(input_h5['nan_indices_all'])
+                nan_indices_all.update(input_h5.attrs['nan_indices_all'])
 
                 # Create a group for this subject in the output file
                 subject_group = output_h5.create_group(subject_group_name)
@@ -74,8 +74,8 @@ def aggregate_hdf5_files(input_dir, output_filepath):
                 
                 # Copy all the data
                 copy_group_recursive(input_h5, subject_group)
-                
-        output_h5.attrs.create('nan_indices_all', np.array(nan_indices_all)) #these nan indices are not ordered
+
+        output_h5.attrs.create('nan_indices_all', np.array(list(nan_indices_all))) #these nan indices are not ordered
     
     print(f"Successfully aggregated {len(hdf5_files)} files into {output_filepath}")
 
@@ -97,10 +97,12 @@ if __name__ == "__main__":
                        help="Directory containing individual HDF5 files")
     parser.add_argument("--output_dir", type=str, required=False, default=os.path.join(root_default, "hdf5_files", "merged"),
                        help="Directory containing individual HDF5 files")
-    parser.add_argument("--output_file", type=str, required=False, default="mosaic_ram.hdf5",
+    parser.add_argument("--output_file", type=str, required=False, default="mosaic_ind.hdf5",
                        help="Output filename for aggregated HDF5 file")
     
     args = parser.parse_args()
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
     
     output_filepath = os.path.join(args.output_dir, args.output_file)
 
