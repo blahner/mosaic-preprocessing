@@ -36,6 +36,8 @@ def main(args):
         grp.attrs.create('preprocessing_pipeline', args.preprocessing_pipeline)
         grp.attrs.create('beta_pipeline', args.beta_pipeline)
 
+        nan_indices_all = set() #keep track of all nan indices over all single trial beta estimates and noiseceilings
+
         #second add noisceilings, if applicable
         if args.subjectID_dataset not in args.no_noiseceilings:
             #load noiseceiling from the dataset validation folder
@@ -67,7 +69,8 @@ def main(args):
                 #identify nans
                 not_real_mask = np.isnan(response) | np.isinf(response) #True means its not real
                 nan_indices = np.where(not_real_mask)[0] #wrt the fsLR32k whole brain space
-                
+                nan_indices_all.update(nan_indices)
+
                 #add to hdf5 file
                 dset = grp_noiseceiling.create_dataset(core_filename, data=response, track_order=True)
                 dset.attrs.create('nan_indices', nan_indices)
@@ -110,6 +113,7 @@ def main(args):
                     #identify nans
                     not_real_mask = np.isnan(response) | np.isinf(response) #True means its not real
                     nan_indices = np.where(not_real_mask)[0] #wrt the fsLR32k whole brain space
+                    nan_indices_all.update(nan_indices)
 
                     #add to hdf5 file
                     dset = grp_betas.create_dataset(f"{subjectID}_{fmri_dataset_name}_stimulus-{stim_name}_phase-{phase}_rep-{rep}",
@@ -119,6 +123,8 @@ def main(args):
                     dset.attrs.create('phase', phase)
                     dset.attrs.create('repetition', rep)
                     dset.attrs.create('presented_stimulus_filename', Path(stimorder[stim]).name)
+        #add all nan_indices
+        grp.attrs.create('nan_indices_all', np.array(nan_indices_all)) #these nan indices are not ordered
 
 if __name__=='__main__':
     root_default = os.getenv("DATASETS_ROOT", "/default/path/to/datasets") #use default if DATASETS_ROOT env variable is not set.

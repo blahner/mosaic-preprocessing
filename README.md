@@ -174,9 +174,9 @@ INPUTS: beta estimate pickle files from step 4, noise ceiling npy files from ste
 OUTPUTS: .hdf5 file
 
 ```
-python src/fmriDatasetPreparation/create_hdf5/create_hdf5.py --subjectID_dataset sub-XX_DATASET --owner_name "firstName lastName" --owner_email youremail@email.com
+python src/fmriDatasetPreparation/create_hdf5/create_hdf5_pkl.py --subjectID_dataset sub-XX_DATASET --owner_name "firstName lastName" --owner_email youremail@email.com
 
-python src/fmriDatasetPreparation/create_hdf5/create_hdf5.py --subjectID_dataset sub-01_NSD --owner_name "Benjamin Lahner" --owner_email blahner@mit.edu
+python src/fmriDatasetPreparation/create_hdf5/create_hdf5_pkl.py --subjectID_dataset sub-01_NSD --owner_name "Benjamin Lahner" --owner_email blahner@mit.edu
 ```
 
 Note that the .hdf5 files include all single trial beta estimates. Subsequent stimulus set filtering when you aggregate subjects/datasets into your MOSAIC dataset will output train and test set .json files that will simply not reference the stimuli and fMRI trials that get filtered out. But the .hdf5 files themselves are agnostic to this stimulus set filtering.
@@ -206,12 +206,12 @@ on the access patterns you expect to use, one will just be faster.
 
 Assuming the single subject hdf5 files are in /your/path/to/datasets/MOSAIC/hdf5_files/single_subject
 
-For random access:
+For frequently accessing individual trials:
 ```
 python src/fmriDatasetPreparation/create_hdf5/merge_hdf5_ind.py --input_dir /your/path/to/datasets/MOSAIC/hdf5_files/single_subject ---output_dir /your/path/to/datasets/MOSAIC/hdf5_files/merged --output_file mosaic_ind.hdf5
 ```
 
-For chunks:
+For frequently accessing chunks:
 ```
 python src/fmriDatasetPreparation/create_hdf5/merge_hdf5_chunks.py --input_dir /your/path/to/datasets/MOSAIC/hdf5_files/single_subject ---output_dir /your/path/to/datasets/MOSAIC/hdf5_files/merged --output_file mosaic_chunks.hdf5
 ```

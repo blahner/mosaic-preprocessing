@@ -5,6 +5,7 @@ import glob
 import os
 from pathlib import Path
 from tqdm import tqdm
+import numpy as np
 
 root_default = os.path.join(os.getenv("DATASETS_ROOT", "/default/path/to/datasets"), "MOSAIC") #use default if DATASETS_ROOT env variable is not set.
 
@@ -28,7 +29,7 @@ def aggregate_hdf5_files(input_dir, output_filepath):
     
     # Create the aggregated file
     with h5py.File(output_filepath, 'w') as output_h5:
-        
+        nan_indices_all = set() #keep track of all nan indices across all subjects and datasets
         for hdf5_file in tqdm(hdf5_files, desc="Aggregating files"):
             # Extract subject ID from filename (format: sub-XX_DATASET_crc32-YYYYYYYY.hdf5)
             filename = Path(hdf5_file).stem
@@ -43,7 +44,8 @@ def aggregate_hdf5_files(input_dir, output_filepath):
             
             # Open the individual file
             with h5py.File(hdf5_file, 'r') as input_h5:
-                
+                nan_indices_all.update(input_h5['nan_indices_all'])
+
                 # Create a group for this subject in the output file
                 subject_group = output_h5.create_group(subject_group_name)
                 
@@ -72,6 +74,8 @@ def aggregate_hdf5_files(input_dir, output_filepath):
                 
                 # Copy all the data
                 copy_group_recursive(input_h5, subject_group)
+                
+        output_h5.attrs.create('nan_indices_all', np.array(nan_indices_all)) #these nan indices are not ordered
     
     print(f"Successfully aggregated {len(hdf5_files)} files into {output_filepath}")
 
