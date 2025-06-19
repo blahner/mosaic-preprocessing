@@ -4,7 +4,9 @@ ipykernel
 matplotlib
 nilearn
 numpy==1.26.4
+opencv-python
 pandas
+pycocotools
 python-dotenv
 scipy
 torch
