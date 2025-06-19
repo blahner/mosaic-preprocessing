@@ -18,6 +18,14 @@
             ]
         },
         {
+            "name": "merge hdf5 files individual",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/data/vision/torralba/selfmanaged/oliva/u/blahner/projects/mosaic-preprocessing/src/fmriDatasetPreparation/create_hdf5/merge_hdf5_ind.py",
+            "console": "integratedTerminal",
+            "args": []
+        },
+        {
             "name": "merge hdf5 files chunks",
             "type": "debugpy",
             "request": "launch",

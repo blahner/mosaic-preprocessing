@@ -126,8 +126,9 @@ def main(args):
                     dset.attrs.create('repetition', rep)
                     dset.attrs.create('presented_stimulus_filename', Path(stimorder[stim]).name)
         #add all nan_indices
-        grp.attrs.create('nan_indices_all', np.array(list(nan_indices_all))) #these nan indices are not ordered
+        grp.create_dataset('nan_indices_all', data=np.array(list(nan_indices_all))) #these nan indices are not ordered
 
+        #grp.attrs.create('nan_indices_all', np.array(list(nan_indices_all))) 
 if __name__=='__main__':
     root_default = os.getenv("DATASETS_ROOT", "/default/path/to/datasets") #use default if DATASETS_ROOT env variable is not set.
 

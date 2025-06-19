@@ -44,7 +44,7 @@ def aggregate_hdf5_files(input_dir, output_filepath):
             
             # Open the individual file
             with h5py.File(hdf5_file, 'r') as input_h5:
-                nan_indices_all.update(input_h5.attrs['nan_indices_all'])
+                nan_indices_all.update(input_h5['nan_indices_all'])
 
                 # Create a group for this subject in the output file
                 subject_group = output_h5.create_group(subject_group_name)
@@ -75,7 +75,7 @@ def aggregate_hdf5_files(input_dir, output_filepath):
                 # Copy all the data
                 copy_group_recursive(input_h5, subject_group)
 
-        output_h5.attrs.create('nan_indices_all', np.array(list(nan_indices_all))) #these nan indices are not ordered
+        output_h5.create_dataset('nan_indices_all', data=np.array(list(nan_indices_all))) #these nan indices are not ordered
     
     print(f"Successfully aggregated {len(hdf5_files)} files into {output_filepath}")
 
@@ -83,7 +83,7 @@ def main():
     # Example usage
     input_dir = "path/to/individual/hdf5/files"
     output_dir = "path/to/merged/hdf5/files"
-    output_file = "mosaic_ram.hdf5"
+    output_file = "mosaic_ind.hdf5"
     
     output_filepath = os.path.join(output_dir, output_file)
 
