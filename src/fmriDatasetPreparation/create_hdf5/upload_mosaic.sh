@@ -2,22 +2,22 @@
 #!/bin/bash
 set -e
 
-#declare -A dataset_subjects=(
-#    ["BMD"]=10
-#    ["HAD"]=30   
-#    ["NSD"]=8 
-#    ["BOLD5000"]=4 
-#    ["NOD"]=30
-#    ["deeprecon"]=3 
-#    ["THINGS"]=3
-#    ["GOD"]=5
-#)
-
 declare -A dataset_subjects=(
+    ["BMD"]=10
+    ["HAD"]=30   
+    ["NSD"]=8 
+    ["BOLD5000"]=4 
+    ["NOD"]=30
     ["deeprecon"]=3 
     ["THINGS"]=3
     ["GOD"]=5
 )
+
+#declare -A dataset_subjects=(
+#    ["deeprecon"]=3 
+#    ["THINGS"]=3
+#    ["GOD"]=5
+#)
 
 echo "Starting batch processing..."
 
@@ -33,17 +33,17 @@ for dataset in "${!dataset_subjects[@]}"; do
         echo "Processing: ${subjectID_dataset}"
         
         # Create HDF5 file
-        python create_hdf5.py \
-            --subjectID_dataset "${subjectID_dataset}" \
-            --owner_name "Benjamin Lahner" \
-            --owner_email "blahner@mit.edu"
+        #python create_hdf5_pkl.py \
+        #    --subjectID_dataset "${subjectID_dataset}" \
+        #    --owner_name "Benjamin Lahner" \
+        #    --owner_email "blahner@mit.edu"
         
         # Upload to S3
         python upload_hdf5.py \
-            --file_path "/data/vision/oliva/datasets/MOSAIC/hdf5_files/${subjectID_dataset}.hdf5"
+            --file_path "/data/vision/oliva/datasets/MOSAIC/hdf5_files/single_subject/${subjectID_dataset}.hdf5"
         
         # Clean up local file
-        rm "/data/vision/oliva/datasets/MOSAIC/hdf5_files/${subjectID_dataset}.hdf5"
+        #rm "/data/vision/oliva/datasets/MOSAIC/hdf5_files/single_subject/${subjectID_dataset}.hdf5"
         
         echo "✅ Finished ${subjectID_dataset}"
     done
