@@ -13,4 +13,5 @@ pycocotools
 python-dotenv
 scipy
 torch
+torchvision
 tqdm

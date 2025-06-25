@@ -4,9 +4,9 @@
 <img src="https://github.com/blahner/mosaic-preprocessing/blob/main/assets/mosaic_logo.png" width="50%" alt="MOSAIC Logo">
 </p>
     
-This repository serves two purposes: (1) share the preprocessing code for the eight datasets used in the original MOSAIC publication and (2) provide a template repository for others to preprocess their fMRI dataset to be MOSAIC-compliant. A public GitHub repository that includes all preprocessing scripts, like this repository, is required to make your fMRI dataset MOSAIC-compliant.
+This repository serves two purposes: (1) share the preprocessing code for the eight datasets used in the original MOSAIC [publication](TODO) and (2) provide a template repository for others to preprocess their fMRI dataset to be MOSAIC-compliant. A public GitHub repository that includes all preprocessing scripts, like this repository, is required to make your fMRI dataset MOSAIC-compliant.
 
-## MOSAIC preprocessing for the MOSAIC [manuscript](TODO)
+## Getting started
 This repository details the preprocessing for the following datasets:
 
 - [BOLD5000](https://openneuro.org/datasets/ds001499)
@@ -18,8 +18,25 @@ This repository details the preprocessing for the following datasets:
 - [Natural Object Dataset (NOD)](https://openneuro.org/datasets/ds004496)
 - [Natural Scenes Dataset (NSD)](https://registry.opendata.aws/nsd/)
 
-The steps are preprocessing stimulus set, fMRI data, and validation. The goal of this first part is to enable others to reproduce your preprocessing.
-First, create an environment.
+I found it easiest to separate dataset-specific folders (e.g., like what you would download from OpenNeuro) from an aggregated MOSAIC dataset folder like:
+```
+./datasets/
+├── <fMRI DATASET A>/
+├── <fMRI DATASET B>/
+├── <fMRI DATASET Z>/
+├── MOSAIC/
+```
+
+The central MOSAIC folder will look like:
+```
+./datasets/MOSAIC/
+├── stimuli/
+├── testtrain/
+├── hdf5_files/
+├── participants/
+```
+
+If you want to preprocess your own dataset or re-implement the dataset preprocessing of the eight datasets above, continue to create your environment. Otherwise, skip to the "I want to use the originally published MOSAIC dataset" section.
 
 ```
 conda create -n mosaic-preprocessing python=3.11
@@ -39,24 +56,6 @@ Set up your .env file
 cp .env.example .env
 ```
 The .env file defines paths to your project directory, datasets, tmp directories for fMRIPrep, etc.
-
-I found it easiest to separate dataset-specific folders (e.g., like what you would download from OpenNeuro) from an aggregated MOSAIC dataset folder like:
-```
-./datasets/
-├── <fMRI DATASET A>/
-├── <fMRI DATASET B>/
-├── <fMRI DATASET Z>/
-├── MOSAIC/
-```
-
-The central MOSAIC folder will look like:
-```
-./datasets/MOSAIC/
-├── stimuli/
-├── testtrain/
-├── hdf5_files/
-├── participants/
-```
 
 The path to the datasets should be set as an environment variable DATASET_ROOT.
 Your path to this repository will likely be in a different directory entirely and set as an environment variable PROJECT_ROOT. 'source' your .env file.
