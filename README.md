@@ -6,6 +6,11 @@
     
 This repository serves two purposes: (1) share the preprocessing code for the eight datasets used in the original MOSAIC [publication](TODO) and (2) provide a template repository for others to preprocess their fMRI dataset to be MOSAIC-compliant. A public GitHub repository that includes all preprocessing scripts, like this repository, is required to make your fMRI dataset MOSAIC-compliant.
 
+Additional links:  
+- [MOSAIC Manuscript Draft](https://drive.google.com/file/d/1XR3tSDMZ7S46qHmtXE1qipbgbQopEcXp/view?usp=sharing)
+- [Download portal website](https://mosaic.csail.mit.edu/)
+- [Download portal website GitHub](https://github.com/blahner/mosaic-website)
+
 ## Getting started
 This repository details the preprocessing for the following datasets:
 
