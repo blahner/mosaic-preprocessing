@@ -7,9 +7,9 @@
 This repository serves two purposes: (1) share the preprocessing code for the eight datasets used in the original MOSAIC [publication](TODO) and (2) provide a template repository for others to preprocess their fMRI dataset to be MOSAIC-compliant. A public GitHub repository that includes all preprocessing scripts, like this repository, is required to make your fMRI dataset MOSAIC-compliant.
 
 Additional links:  
-- [MOSAIC Manuscript Draft](https://drive.google.com/file/d/1XR3tSDMZ7S46qHmtXE1qipbgbQopEcXp/view?usp=sharing)
-- [Download portal website](https://mosaic.csail.mit.edu/)
-- [Download portal website GitHub](https://github.com/blahner/mosaic-website)
+- [MOSAIC Manuscript](TODO)
+- [MOSAIC dataset download page](https://aws.amazon.com/marketplace/pp/prodview-vsoockzeptxzw#resources)
+- [Manuscript code](TODO)
 
 ## Getting started
 This repository details the preprocessing for the following datasets:
@@ -69,13 +69,12 @@ If you want to run the fMRIPrep scripts, follow [fMRIPrep's installation guide](
 
 [Human Connectome Workbench](https://www.humanconnectome.org/software/connectome-workbench) and [HCP-utils](https://rmldj.github.io/hcp-utils/) provide useful functions for preprocessing, visualization, and analysis, especially in the fsLR32k space. Follow their installation instructions linked above.
 
-## Using the MOSAIC dataset
-You can use the MOSAIC dataset as-is from the MOSAIC [manuscript](TODO) or you can preprocess your own dataset to add to it.
+You can use the MOSAIC dataset as-is from the MOSAIC [manuscript](TODO) or you can preprocess your own dataset to add to it. See the relevant sections below
 
-### I want to use the originally published MOSAIC dataset
-To use the version of MOSAIC with 8 datasets published [here](TODO), you need to:
-1. Download the subject-specific fMRI data from the [MOSAIC portal](mosaic.csail.mit.edu)
-2. Download the train-test json splits from the [MOSAIC portal](mosaic.csail.mit.edu)
+## I want to use the originally published MOSAIC dataset
+To use the version of MOSAIC with 8 datasets in the original manuscript published [here](TODO), you can download the data from this [S3 bucket](https://aws.amazon.com/marketplace/pp/prodview-vsoockzeptxzw#resources):
+1. Download the subject-specific fMRI data from the eight datasets (DATASET) above in ./fMRIPrepv22_2/task/betas/GLMsinglev1.2/DATASET/*.hdf5
+2. Download the train-test json splits from ./splits/lahneretal2025/ the [MOSAIC S3 bucket](mosaic.csail.mit.edu)
 3. Download the stimulus sets from their original source (see detailed instructions below).
 
 a. Since it is common for stimulus sets to not be under a Creative Commons license, we do not host or distribute any stimulus sets. Please download the stimulus sets following the instructions of the original publication. We provide download scripts when possible or else point you to the download instructions below:
@@ -101,7 +100,7 @@ src/stimulusSetPreparation/compile_datasets/save_nsdsynthetic_stimuli.ipynb
 INPUTS: mp4 videos and nsd synthetic stimuli .hdf5 file in dataset-specific folder  
 OUTPUTS: jpg video frames and jpg nsd synthetic stimuli in dataset-specific folder
 
-c. Next, move all stimuli into MOSAIC stimulus folder. Here, the order you move the stimuli into this folder might matter if the stimuli share the same filename.  
+c. Next, move all stimuli into MOSAIC stimulus folder. Here, the order you move the stimuli into this folder might matter if the stimuli share the same filename. For some datasets, this script also changes the stimulus filenames from a dataset-specific naming convention used in the dataset's release to an original source filename. For example, BMD releasese videos named 0001.mp4 to 1102.mp4, for example, but in this script these filenames are reverted back to its original filename from the source Multi-Moments in Time dataset.
 ```
 bash src/stimulusSetPreparation/compile_datasets/copy_dataset_stim.sh
 ```
@@ -109,8 +108,12 @@ bash src/stimulusSetPreparation/compile_datasets/copy_dataset_stim.sh
 INPUTS: stimuli in their dataset specific folder  
 OUTPUTS: stimuli in the MOSAIC stimuli folder
 
-### I want to add my own fMRI dataset to MOSAIC
+A final note, some models do not accept .tif or .tiff file formats as inputs. So, for the Deeprecon artificial stimuli that have a .tif and .tiff extension, I use an online tiff-to-jpg converter to quickly get jpg versions of these stimuli and put them in a folder inside MOSAIC/stimuli/.
+
+## I want to add my own fMRI dataset to MOSAIC
 To add your own fMRI dataset to MOSAIC, you must preprocess it in a specific format in order to make it compatible with the other datasets in MOSAIC. We demonstrate this preprocessing here using the original 8 MOSAIC datasets as an example. MOSAIC preprocessing can be divided in two stages: fMRI and stimulus set. Here we describe the preprocessing for the initial set of 8 datasets in the MOSAIC manuscript. If you want to add a ninth dataset that is MOSAIC-compatible with the other eight, for example, follow this pipeline. Otherwise, feel free to preprocess datasets with other pipelines, recognizing that they will not be MOSAIC compatible with the initial eight.
+
+If you just want to use the MOSAIC data published in the original mansucript, follow the instructions in "I want to use the originally published MOSAIC dataset" above then continue to the "Merging hdf5 files into a MOSAIC" section below.
 
 ### Stimulus set preprocessing
 1. Follow the steps above to download the stimulus sets and move them into a shared MOSAIC stimuli folder.
@@ -132,7 +135,7 @@ python src/stimulusSetPreparation/extract_embeddings/dreamsim_embeddings.py
 INPUTS: DreamSim embedding pickle file (or can vary based on how you want to determine test/train split)  
 OUTPUTS: pickle file containing list of stimuli in test and train splits (but can also vary based on your method).
 
-As an example, neither HAD nor NOD defined test train splits. HAD was simple enough to define based on the experimental runs. NOD was a bit trickier, and our method required these scripts that used dreamsim embeddings.
+As an example, neither HAD nor NOD defined test train splits. HAD was simple enough to define based on the experimental runs because they regularly clycled through action categories per run. NOD was a bit trickier, and our method required these scripts that used dreamsim embeddings.
 ```
 python src/stimulusSetPreparation/extract_dataset_stiminfo/nod_testtrain_splits/make_imagenet_splits_rdm.py
 python src/stimulusSetPreparation/extract_dataset_stiminfo/nod_testtrain_splits/make_coco_splits_rdm.py
@@ -221,19 +224,18 @@ OUTPUTS: .hdf5 file
 
 ```
 python src/fmriDatasetPreparation/create_hdf5/create_hdf5_pkl.py --subjectID_dataset sub-XX_DATASET --owner_name "firstName lastName" --owner_email youremail@email.com
-
-python src/fmriDatasetPreparation/create_hdf5/create_hdf5_pkl.py --subjectID_dataset sub-01_NSD --owner_name "Benjamin Lahner" --owner_email blahner@mit.edu
 ```
 
 Note that the .hdf5 files include all single trial beta estimates. Subsequent stimulus set filtering when you aggregate subjects/datasets into your MOSAIC dataset will output train and test set .json files that will simply not reference the stimuli and fMRI trials that get filtered out. But the .hdf5 files themselves are agnostic to this stimulus set filtering.
 
-### Validation
+#### fMRI Validation
 Finally, share some preprocessing validation reports. We recommend sharing fMRIPrep's output (or the equivalent if you are using a different pipeline) and noise ceiling estimates.
 - [fMRIPrep reports](https://drive.google.com/drive/folders/1HM_YeygB6IgxbGx_IalKFN66slG4Lxmo?usp=sharing)
-- [Noise ceiling estimates](TODO)
+- [Noise ceiling estimates](https://drive.google.com/drive/folders/1CC2D9s9oI6UTaTbLdfmpp9VIPZAt9Uys?usp=sharing)
 
 ### Upload single subject hdf5 files to the MOSAIC website
-For a fMRI dataset of n subjects, you will upload n+1 files:
+Reach out to mosaicfmri@gmail.com for help uploading your dataset to the MOSAIC S3 bucket.
+For a fMRI dataset of n subjects, you will need n+1 files:
 
 1. n .hdf5 files, one for each of the n subjects.
 2. One .tsv file containing the detailed stimulus set information.
@@ -241,13 +243,9 @@ For a fMRI dataset of n subjects, you will upload n+1 files:
 Do not upload the stimuli themselves. Most stimulus sets have copyright restrictions with varying terms and conditions. MOSAIC does not have the rights to redistribute these stimulus sets, so please download them from the original source that should be detailed in the fMRI dataset's original publication.
 
 ## Merging hdf5 files into a MOSAIC
-At this step, you have either preprocessed your own datsets into single subject .hdf5 files, or you have downloaded single subject .hdf5 files 
-from the MOSAIC data management portal. While you don't have to merge them, merging them into a single .hdf5 file is helpful for many analyses,
-like model training.
+At this step, you have either preprocessed your own datsets into single subject .hdf5 files, or you have downloaded single subject .hdf5 files from the MOSAIC data management portal. While you don't have to merge them, merging them into a single .hdf5 file is helpful for many analyses, like model training.
 
-I found it helpful to have two copies of MOSAIC data - one for experiments that access individual trials (like model training) and one for experiments
-that access data in chunks/batches (like loading all subject data at once). I show how to do both. Either one will work for any case, but depending
-on the access patterns you expect to use, one will just be faster. 
+I found it helpful to have two copies of MOSAIC data - one for experiments that access individual trials (like model training) and one for experiments that access data in chunks/batches (like loading all subject data at once). I show how to do both. Either one will work for any case, but depending on the access patterns you expect to use, one will just be faster. 
 
 Assuming the single subject hdf5 files are in /your/path/to/datasets/MOSAIC/hdf5_files/single_subject
 
@@ -268,6 +266,11 @@ Additionally, hdf5 files handle concurrent reads nicely for multi-thread process
 all the data, although large, is much easier to organize and share than hundreds of thousands of individual files.
 
 We provide a notebook 'src/fmriDatasetPreparation/create_hdf5/load_hdf5.ipynb' that shows you basic hdf5 loading commands.
+
+## Starter code
+(Coming Soon) Here are some basic notebooks that help you get familiar with the data. 
+- Load betas from an hdf5 file and visualize the beta values on brain
+- From the original manuscript's code repository, run a synthetic localizer on NSD subjects using a brain-optimized model
 
 ## Citation
 If you use MOSAIC, please cite the original MOSAIC manuscript and the orginal publications of each of the datasets.
