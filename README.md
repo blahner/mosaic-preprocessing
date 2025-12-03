@@ -8,7 +8,7 @@ This repository serves two purposes: (1) share the preprocessing code for the ei
 
 Additional links:  
 - [MOSAIC Manuscript](https://www.biorxiv.org/content/10.64898/2025.11.28.690060v1)
-- [MOSAIC dataset (fMRI)](https://aws.amazon.com/marketplace/pp/prodview-vsoockzeptxzw#resources)
+- [MOSAIC dataset (fMRI and model weights)](https://aws.amazon.com/marketplace/pp/prodview-vsoockzeptxzw#resources)
 - [Links to starter code](https://aws.amazon.com/marketplace/pp/prodview-vsoockzeptxzw#resources)
 - [MOSAIC python package for easy download](https://github.com/murtylab/mosaic-dataset)
 - [Manuscript code (coming soon)](TODO)
@@ -74,9 +74,9 @@ If you want to run the fMRIPrep scripts, follow [fMRIPrep's installation guide](
 You can use the MOSAIC dataset as-is from the MOSAIC [manuscript](TODO) or you can preprocess your own dataset to add to it. See the relevant sections below
 
 ## I want to use the originally published MOSAIC dataset
-To use the version of MOSAIC with 8 datasets in the original manuscript published [here](https://www.biorxiv.org/content/10.64898/2025.11.28.690060v1), you can download the fMRI data from this [S3 bucket](https://aws.amazon.com/marketplace/pp/prodview-vsoockzeptxzw#resources):
-1. Download the subject-specific fMRI data from the eight datasets (DATASET) above in ./fMRIPrepv22_2/task/betas/GLMsinglev1.2/DATASET/*.hdf5
-2. Download the train-test json splits from ./splits/lahneretal2025/ the [MOSAIC S3 bucket](mosaic.csail.mit.edu)
+To use the version of MOSAIC with 8 datasets in the original manuscript published [here](https://www.biorxiv.org/content/10.64898/2025.11.28.690060v1), you can download the fMRI data from this [S3 bucket](https://aws.amazon.com/marketplace/pp/prodview-vsoockzeptxzw#resources). Note that we release task beta value data, task timeseries data, and resting state timeseries data. Here we describe task beta value data:
+1. Download the subject-specific fMRI data from the eight datasets (DATASET) above in ./fMRIPrepv23_2_0/task_fMRI/betas/GLMsinglev1_2/DATASET/*.hdf5
+2. Download the train-test json splits from ./train_test_splits/ 
 3. Download the stimulus sets from their original source (see detailed instructions below).
 
 a. Since it is common for stimulus sets to not be under a Creative Commons license, we do not host or distribute any stimulus sets. Please download the stimulus sets following the instructions of the original publication. We provide download scripts when possible or else point you to the download instructions below:
