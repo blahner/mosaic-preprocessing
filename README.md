@@ -4,12 +4,14 @@
 <img src="https://github.com/blahner/mosaic-preprocessing/blob/main/assets/mosaic_logo.png" width="50%" alt="MOSAIC Logo">
 </p>
     
-This repository serves two purposes: (1) share the preprocessing code for the eight datasets used in the original MOSAIC [publication](TODO) and (2) provide a template repository for others to preprocess their fMRI dataset to be MOSAIC-compliant. A public GitHub repository that includes all preprocessing scripts, like this repository, is required to make your fMRI dataset MOSAIC-compliant.
+This repository serves two purposes: (1) share the preprocessing code for the eight datasets used in the original MOSAIC [publication](https://www.biorxiv.org/content/10.64898/2025.11.28.690060v1) and (2) provide a template repository for others to preprocess their fMRI dataset to be MOSAIC-compliant. If a researcher wants to add their dataset to MOSAIC they should send an email to mosaicfmri@gmail.com. Currently, adding datasets will be done on a case-by-case basis in close coordination with the authors while we work out a more automated process. The general workflow to add a dataset to MOSAIC is detailed in this README.
 
 Additional links:  
-- [MOSAIC Manuscript](TODO)
-- [MOSAIC dataset download page](https://aws.amazon.com/marketplace/pp/prodview-vsoockzeptxzw#resources)
-- [Manuscript code](TODO)
+- [MOSAIC Manuscript](https://www.biorxiv.org/content/10.64898/2025.11.28.690060v1)
+- [MOSAIC dataset (fMRI)](https://aws.amazon.com/marketplace/pp/prodview-vsoockzeptxzw#resources)
+- [Links to starter code](https://aws.amazon.com/marketplace/pp/prodview-vsoockzeptxzw#resources)
+- [MOSAIC python package for easy download](https://github.com/murtylab/mosaic-dataset)
+- [Manuscript code (coming soon)](TODO)
 
 ## Getting started
 This repository details the preprocessing for the following datasets:
@@ -72,7 +74,7 @@ If you want to run the fMRIPrep scripts, follow [fMRIPrep's installation guide](
 You can use the MOSAIC dataset as-is from the MOSAIC [manuscript](TODO) or you can preprocess your own dataset to add to it. See the relevant sections below
 
 ## I want to use the originally published MOSAIC dataset
-To use the version of MOSAIC with 8 datasets in the original manuscript published [here](TODO), you can download the data from this [S3 bucket](https://aws.amazon.com/marketplace/pp/prodview-vsoockzeptxzw#resources):
+To use the version of MOSAIC with 8 datasets in the original manuscript published [here](https://www.biorxiv.org/content/10.64898/2025.11.28.690060v1), you can download the fMRI data from this [S3 bucket](https://aws.amazon.com/marketplace/pp/prodview-vsoockzeptxzw#resources):
 1. Download the subject-specific fMRI data from the eight datasets (DATASET) above in ./fMRIPrepv22_2/task/betas/GLMsinglev1.2/DATASET/*.hdf5
 2. Download the train-test json splits from ./splits/lahneretal2025/ the [MOSAIC S3 bucket](mosaic.csail.mit.edu)
 3. Download the stimulus sets from their original source (see detailed instructions below).
@@ -110,7 +112,11 @@ OUTPUTS: stimuli in the MOSAIC stimuli folder
 
 A final note, some models do not accept .tif or .tiff file formats as inputs. So, for the Deeprecon artificial stimuli that have a .tif and .tiff extension, I use an online tiff-to-jpg converter to quickly get jpg versions of these stimuli and put them in a folder inside MOSAIC/stimuli/.
 
+If you are still having trouble downloading and processing the stimuli, send an email to mosaicfmri@gmail.com with subject line MOSAIC STIMULUS SET for help.
+
 ## I want to add my own fMRI dataset to MOSAIC
+Adding datasets to MOSAIC is currently done on a case by case basis in close coordination with the study authors as we work out how to make this process more automatic. In the meantime, the general workflow to adding your own dataset will look like below.
+
 To add your own fMRI dataset to MOSAIC, you must preprocess it in a specific format in order to make it compatible with the other datasets in MOSAIC. We demonstrate this preprocessing here using the original 8 MOSAIC datasets as an example. MOSAIC preprocessing can be divided in two stages: fMRI and stimulus set. Here we describe the preprocessing for the initial set of 8 datasets in the MOSAIC manuscript. If you want to add a ninth dataset that is MOSAIC-compatible with the other eight, for example, follow this pipeline. Otherwise, feel free to preprocess datasets with other pipelines, recognizing that they will not be MOSAIC compatible with the initial eight.
 
 If you just want to use the MOSAIC data published in the original mansucript, follow the instructions in "I want to use the originally published MOSAIC dataset" above then continue to the "Merging hdf5 files into a MOSAIC" section below.
@@ -243,6 +249,8 @@ For a fMRI dataset of n subjects, you will need n+1 files:
 Do not upload the stimuli themselves. Most stimulus sets have copyright restrictions with varying terms and conditions. MOSAIC does not have the rights to redistribute these stimulus sets, so please download them from the original source that should be detailed in the fMRI dataset's original publication.
 
 ## Merging hdf5 files into a MOSAIC
+** You can also use the python package [mosaic-dataset](https://github.com/murtylab/mosaic-dataset) to merge hdf5 files too **
+
 At this step, you have either preprocessed your own datsets into single subject .hdf5 files, or you have downloaded single subject .hdf5 files from the MOSAIC data management portal. While you don't have to merge them, merging them into a single .hdf5 file is helpful for many analyses, like model training.
 
 I found it helpful to have two copies of MOSAIC data - one for experiments that access individual trials (like model training) and one for experiments that access data in chunks/batches (like loading all subject data at once). I show how to do both. Either one will work for any case, but depending on the access patterns you expect to use, one will just be faster. 
@@ -265,12 +273,11 @@ The hdf5 hierarchical [format](https://docs.h5py.org/en/stable/quick.html) is a 
 Additionally, hdf5 files handle concurrent reads nicely for multi-thread processing and allow you to store metadata ('attributes') right next to the data. A single file with
 all the data, although large, is much easier to organize and share than hundreds of thousands of individual files.
 
-We provide a notebook 'src/fmriDatasetPreparation/create_hdf5/load_hdf5.ipynb' that shows you basic hdf5 loading commands.
-
-## Starter code
-(Coming Soon) Here are some basic notebooks that help you get familiar with the data. 
-- Load betas from an hdf5 file and visualize the beta values on brain
-- From the original manuscript's code repository, run a synthetic localizer on NSD subjects using a brain-optimized model
-
 ## Citation
 If you use MOSAIC, please cite the original MOSAIC manuscript and the orginal publications of each of the datasets.
+
+```
+MOSAIC: A scalable framework for fMRI dataset aggregation and modeling of human vision
+Benjamin Lahner, Mayukh Deb, N. Apurva Ratan Murty, Aude Oliva
+bioRxiv 2025.11.28.690060; doi: https://doi.org/10.64898/2025.11.28.690060
+```
