@@ -2,6 +2,7 @@
 *.png 
 *.svg
 *.eps
+*.mgh
 !mosaic_logo.png
 
 # numpy files
@@ -9,6 +10,9 @@
 
 # models
 src/stimulusSetPreparation/visualizations/models/
+
+#freesurfer files
+src/fmriDatasetPreparation/datasets/NaturalScenesDataset/validation/output/nsd_freesurfer_original/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
