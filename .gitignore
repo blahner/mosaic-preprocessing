@@ -4,6 +4,7 @@
 *.eps
 *.mgh
 !mosaic_logo.png
+*.json
 
 # numpy files
 *.npy
