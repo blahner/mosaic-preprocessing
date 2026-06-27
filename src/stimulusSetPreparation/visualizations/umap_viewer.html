@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOSAIC — CLIP Embedding UMAP</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+    background: #f7f7f7;
+    color: #222;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  header {
+    padding: 10px 18px;
+    background: #1a1a2e;
+    color: #fff;
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 15px; font-weight: 600; letter-spacing: .3px; }
+  header p  { font-size: 11px; color: #aaa; }
+  #app { display: flex; flex: 1; overflow: hidden; }
+
+  /* Sidebar */
+  #sidebar {
+    width: 220px; flex-shrink: 0;
+    background: #fff; border-right: 1px solid #ddd;
+    display: flex; flex-direction: column;
+    overflow-y: auto; padding: 14px 12px; gap: 18px;
+  }
+  .section-title {
+    font-size: 10px; font-weight: 700; letter-spacing: .8px;
+    text-transform: uppercase; color: #888; margin-bottom: 6px;
+  }
+  #color-mode label, #model-select label {
+    display: flex; align-items: center; gap: 6px;
+    cursor: pointer; padding: 3px 0; user-select: none;
+  }
+  .ds-row, .split-row {
+    display: flex; align-items: center; gap: 7px;
+    padding: 3px 0; cursor: pointer; user-select: none;
+  }
+  .ds-row input, .split-row input { cursor: pointer; accent-color: #555; }
+  .ds-swatch   { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .split-swatch{ width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .ds-name  { flex: 1; }
+  .ds-count { font-size: 11px; color: #999; }
+  #stats { font-size: 11px; color: #666; line-height: 1.7; }
+  #stats b { color: #333; }
+  #controls { display: flex; flex-direction: column; gap: 4px; }
+  button {
+    padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px;
+    background: #fff; cursor: pointer; font-size: 12px; color: #333;
+    transition: background .15s;
+  }
+  button:hover { background: #f0f0f0; }
+
+  /* Canvas area */
+  #canvas-wrap {
+    flex: 1; position: relative; overflow: hidden;
+    background: #fafafa; cursor: crosshair;
+  }
+  #canvas-wrap:active { cursor: grabbing; }
+  canvas { position: absolute; top: 0; left: 0; display: block; }
+  #overlay { pointer-events: none; z-index: 2; }
+
+  /* Tooltip */
+  #tooltip {
+    position: absolute;
+    background: rgba(20,20,20,.88); color: #fff;
+    padding: 8px 10px; border-radius: 6px;
+    font-size: 12px; pointer-events: none;
+    display: none; line-height: 1.6;
+    white-space: nowrap; z-index: 10;
+    max-width: 320px;
+  }
+  #tooltip img {
+    display: block;
+    width: 220px; height: 220px;
+    object-fit: contain;
+    background: #111;
+    border-radius: 3px;
+    margin-bottom: 6px;
+  }
+  #reset-btn { position: absolute; bottom: 14px; right: 14px; z-index: 5; font-size: 11px; padding: 4px 9px; }
+  #loading {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; color: #666; background: #fafafa; z-index: 20;
+  }
+
+  /* Mobile hamburger button (hidden on desktop) */
+  #sidebar-toggle {
+    display: none;
+    background: none; border: none; color: #fff;
+    font-size: 20px; padding: 0 4px; cursor: pointer; line-height: 1;
+  }
+  #sidebar-toggle:hover { background: none; }
+
+  /* Sidebar overlay backdrop */
+  #sidebar-backdrop {
+    display: none;
+    position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 29;
+  }
+
+  @media (max-width: 600px) {
+    header { align-items: center; }
+    #sidebar-toggle { display: block; }
+    #app { position: relative; }
+
+    /* Sidebar slides in as overlay */
+    #sidebar {
+      position: absolute; top: 0; left: 0; bottom: 0; z-index: 30;
+      transform: translateX(-100%);
+      transition: transform .22s ease;
+      box-shadow: 2px 0 12px rgba(0,0,0,.25);
+      width: 240px;
+    }
+    #sidebar.open { transform: translateX(0); }
+    #sidebar-backdrop.open { display: block; }
+
+    /* Tooltip: fixed to bottom-center so finger doesn't cover it */
+    #tooltip {
+      position: fixed;
+      bottom: 16px; left: 50%; transform: translateX(-50%);
+      top: auto; right: auto;
+      white-space: normal; max-width: calc(100vw - 32px);
+      pointer-events: auto;
+    }
+    #tooltip img { width: 120px; height: 120px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <button id="sidebar-toggle" aria-label="Toggle filters">☰</button>
+  <h1>MOSAIC — CLIP Embedding UMAP</h1>
+  <p id="header-meta">Loading…</p>
+</header>
+<div id="sidebar-backdrop"></div>
+<div id="app">
+  <aside id="sidebar">
+    <div>
+      <div class="section-title">Embedding model</div>
+      <div id="model-select">
+        <label><input type="radio" name="modelfile" value="clip" checked> CLIP</label>
+        <label><input type="radio" name="modelfile" value="dreamsim"> DreamSim</label>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">Color by</div>
+      <div id="color-mode">
+        <label><input type="radio" name="colormode" value="split" checked> Split / type</label>
+        <label><input type="radio" name="colormode" value="dataset"> Dataset</label>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">Datasets</div>
+      <div id="dataset-toggles"></div>
+    </div>
+    <div>
+      <div class="section-title">Split</div>
+      <div id="split-toggles"></div>
+    </div>
+    <div>
+      <div class="section-title">Info</div>
+      <div id="stats">Loading…</div>
+    </div>
+    <div id="controls">
+      <div class="section-title">Controls</div>
+      <button id="select-all-ds">Select all datasets</button>
+      <button id="deselect-all-ds">Deselect all datasets</button>
+    </div>
+  </aside>
+  <div id="canvas-wrap">
+    <div id="loading">Loading data…</div>
+    <canvas id="plot"></canvas>
+    <canvas id="overlay"></canvas>
+    <div id="tooltip"></div>
+    <button id="reset-btn">Reset zoom</button>
+  </div>
+</div>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+// ── Config ──────────────────────────────────────────────────────────────────
+const DATA_FILES = {
+  clip:     './umap_clip_data.json',
+  dreamsim: './umap_dreamsim_data.json',
+};
+const STIMULI_BASE  = 'https://mosaicfmri.s3.us-west-2.amazonaws.com/assets/stimuli_compressed/';   // full base URL for stimulus images — change this to redirect to a different host/path
+const MARGIN        = 40;            // CSS px padding around data
+
+// Build a URL for an img path from umap_data.json.
+// The first directory component of the path (e.g. "stimuli_compressed") is stripped
+// so that STIMULI_BASE alone controls where images are served from.
+function imgSrc(path) {
+  const stripped = path.replace(/^[^/]*\//, '');
+  return STIMULI_BASE + stripped.split('/').map(encodeURIComponent).join('/');
+}
+
+const DATASET_COLORS = {
+  NSD:'#e41a1c', BOLD5000:'#ff7f00', GOD:'#a65628', NOD:'#984ea3',
+  deeprecon:'#f781bf', THINGS:'#4daf4a', BMD:'#377eb8', HAD:'#00ced1',
+};
+const DATASET_FULL = {
+  NSD:'NaturalScenesDataset', BOLD5000:'BOLD5000', GOD:'GenericObjectDecoding',
+  NOD:'NaturalObjectDataset', deeprecon:'deeprecon', THINGS:'THINGS-fMRI',
+  BMD:'BOLDMomentsDataset', HAD:'HumanActionsDataset',
+};
+const SPLIT_STYLE = {
+  train_nat:{ color:'#2166ac', label:'train / naturalistic',     r:3.0, alpha:0.75 },
+  test_nat: { color:'#f4a261', label:'test / naturalistic',      r:3.0, alpha:0.85 },
+  test_art: { color:'#2a9d8f', label:'test / artificial',        r:3.0, alpha:0.85 },
+  filtered: { color:'#808080', label:'filtered (not in MOSAIC)', r:2.0, alpha:0.85 },
+};
+const SPLIT_ORDER = ['filtered','train_nat','test_nat','test_art'];
+
+// ── State ────────────────────────────────────────────────────────────────────
+let allPoints    = [];
+let activeDsets  = new Set();
+let activeSplits = new Set(SPLIT_ORDER);
+let colorMode    = 'split';
+let transform    = d3.zoomIdentity;
+let xScale, yScale, qtree;
+let rafPending   = false;
+let hoveredPt    = null;
+
+// ── DOM ──────────────────────────────────────────────────────────────────────
+const wrap          = document.getElementById('canvas-wrap');
+const canvas        = document.getElementById('plot');
+const overlayCanvas = document.getElementById('overlay');
+const octx          = overlayCanvas.getContext('2d');
+const tooltip       = document.getElementById('tooltip');
+const loading       = document.getElementById('loading');
+const DPR           = window.devicePixelRatio || 1;
+
+// ── WebGL setup ──────────────────────────────────────────────────────────────
+const gl = canvas.getContext('webgl', { alpha: false, antialias: false, premultipliedAlpha: false });
+if (!gl) { loading.textContent = 'WebGL not supported in this browser.'; }
+
+const VS = `
+  attribute vec2 a_pixel;
+  uniform float u_scale;
+  uniform vec2  u_translate;
+  uniform vec2  u_resolution;
+  uniform float u_point_size;
+  void main() {
+    vec2 screen = a_pixel * u_scale + u_translate;
+    vec2 clip   = screen / u_resolution * 2.0 - 1.0;
+    clip.y      = -clip.y;
+    gl_Position = vec4(clip, 0.0, 1.0);
+    gl_PointSize = u_point_size;
+  }`;
+
+const FS = `
+  precision mediump float;
+  uniform vec4 u_color;
+  void main() {
+    vec2 c = gl_PointCoord - 0.5;
+    if (dot(c,c) > 0.25) discard;
+    gl_FragColor = u_color;
+  }`;
+
+function compileShader(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(s);
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, compileShader(gl.VERTEX_SHADER,   VS));
+gl.attachShader(prog, compileShader(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog);
+gl.useProgram(prog);
+
+const loc = {
+  a_pixel:     gl.getAttribLocation(prog,  'a_pixel'),
+  u_scale:     gl.getUniformLocation(prog, 'u_scale'),
+  u_translate: gl.getUniformLocation(prog, 'u_translate'),
+  u_resolution:gl.getUniformLocation(prog, 'u_resolution'),
+  u_point_size:gl.getUniformLocation(prog, 'u_point_size'),
+  u_color:     gl.getUniformLocation(prog, 'u_color'),
+};
+
+gl.enable(gl.BLEND);
+gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+// ── Buffer management ─────────────────────────────────────────────────────────
+// One Float32Array buffer per split×dataset group for O(1) toggle draws.
+const gpuBuffers = {};  // key: "split__dataset" -> { buf, count }
+
+function buildBuffers() {
+  // Group pixel positions by split×dataset
+  const groups = {};
+  for (const p of allPoints) {
+    const key = `${p.split}__${p.dataset}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(p._px, p._py);
+  }
+  for (const [key, arr] of Object.entries(groups)) {
+    const f32 = new Float32Array(arr);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, f32, gl.STATIC_DRAW);
+    gpuBuffers[key] = { buf, count: arr.length / 2 };
+  }
+}
+
+// ── Scales & quadtree ─────────────────────────────────────────────────────────
+function buildScales() {
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  const xs = allPoints.map(p => p.x), ys = allPoints.map(p => p.y);
+  xScale = d3.scaleLinear().domain(d3.extent(xs)).range([MARGIN, W - MARGIN]).nice();
+  yScale = d3.scaleLinear().domain(d3.extent(ys)).range([H - MARGIN, MARGIN]).nice();
+  allPoints.forEach(p => { p._px = xScale(p.x); p._py = yScale(p.y); });
+}
+
+function buildQuadtree() {
+  qtree = d3.quadtree().x(p => p._px).y(p => p._py).addAll(allPoints);
+}
+
+// ── Resize ────────────────────────────────────────────────────────────────────
+function resize() {
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  canvas.width  = W * DPR;  canvas.height = H * DPR;
+  canvas.style.width  = W + 'px'; canvas.style.height = H + 'px';
+  overlayCanvas.width  = W * DPR;  overlayCanvas.height = H * DPR;
+  overlayCanvas.style.width  = W + 'px'; overlayCanvas.style.height = H + 'px';
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  if (allPoints.length) { buildScales(); buildQuadtree(); buildBuffers(); schedDraw(); }
+}
+window.addEventListener('resize', resize);
+
+// ── Draw ──────────────────────────────────────────────────────────────────────
+function hexToVec4(hex, alpha) {
+  const r = parseInt(hex.slice(1,3),16)/255;
+  const g = parseInt(hex.slice(3,5),16)/255;
+  const b = parseInt(hex.slice(5,7),16)/255;
+  return [r, g, b, alpha];
+}
+
+function draw() {
+  rafPending = false;
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  gl.clearColor(0.98, 0.98, 0.98, 1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+
+  gl.uniform2f(loc.u_resolution, W, H);
+  gl.uniform1f(loc.u_scale,       transform.k);
+  gl.uniform2f(loc.u_translate,   transform.x, transform.y);
+
+  for (const split of SPLIT_ORDER) {
+    if (!activeSplits.has(split)) continue;
+    const style = SPLIT_STYLE[split];
+    gl.uniform1f(loc.u_point_size, style.r * 2 * DPR);
+
+    for (const dataset of activeDsets) {
+      const key  = `${split}__${dataset}`;
+      const grp  = gpuBuffers[key];
+      if (!grp) continue;
+
+      const color = colorMode === 'split'
+        ? hexToVec4(style.color, style.alpha)
+        : hexToVec4(DATASET_COLORS[dataset] || '#888888', style.alpha);
+
+      gl.uniform4fv(loc.u_color, color);
+      gl.bindBuffer(gl.ARRAY_BUFFER, grp.buf);
+      gl.enableVertexAttribArray(loc.a_pixel);
+      gl.vertexAttribPointer(loc.a_pixel, 2, gl.FLOAT, false, 0, 0);
+      gl.drawArrays(gl.POINTS, 0, grp.count);
+    }
+  }
+  drawOverlay();
+}
+
+function schedDraw() {
+  if (!rafPending) { rafPending = true; requestAnimationFrame(draw); }
+}
+
+// ── Highlight ring (2D overlay) ───────────────────────────────────────────────
+function drawOverlay() {
+  octx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  if (!hoveredPt) return;
+  const sx = hoveredPt._px * transform.k + transform.x;
+  const sy = hoveredPt._py * transform.k + transform.y;
+  const r  = 8;  // ring radius in CSS px
+  // White halo for contrast on dark clusters
+  octx.beginPath();
+  octx.arc(sx * DPR, sy * DPR, r * DPR, 0, Math.PI * 2);
+  octx.strokeStyle = 'rgba(255,255,255,0.85)';
+  octx.lineWidth   = 3 * DPR;
+  octx.stroke();
+  // Darker inner ring
+  octx.beginPath();
+  octx.arc(sx * DPR, sy * DPR, r * DPR, 0, Math.PI * 2);
+  octx.strokeStyle = 'rgba(20,20,20,0.75)';
+  octx.lineWidth   = 1.5 * DPR;
+  octx.stroke();
+}
+
+// ── Zoom ──────────────────────────────────────────────────────────────────────
+let zoomBehavior;
+function buildZoom() {
+  zoomBehavior = d3.zoom()
+    .scaleExtent([0.3, 80])
+    .on('zoom', e => { transform = e.transform; schedDraw(); });
+  d3.select(canvas).call(zoomBehavior).on('dblclick.zoom', null);
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    d3.select(canvas).call(zoomBehavior.transform, d3.zoomIdentity);
+  });
+}
+
+// ── Hover ─────────────────────────────────────────────────────────────────────
+canvas.addEventListener('mousemove', e => {
+  if (!qtree) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx   = e.clientX - rect.left;
+  const my   = e.clientY - rect.top;
+  // Invert zoom to pre-zoom pixel space
+  const px = (mx - transform.x) / transform.k;
+  const py = (my - transform.y) / transform.k;
+  const threshold = 14 / transform.k;  // 14 CSS px snap radius
+  const pt = qtree.find(px, py, threshold);
+
+  if (pt && activeDsets.has(pt.dataset) && activeSplits.has(pt.split)) {
+    canvas.style.cursor = 'pointer';
+    if (pt !== hoveredPt) { hoveredPt = pt; drawOverlay(); }
+
+    // Flip tooltip to left side if near right edge
+    const tipW = 260;
+    const left = (mx + 18 + tipW > wrap.clientWidth) ? mx - tipW - 8 : mx + 18;
+    const top  = Math.max(8, Math.min(my - 10, wrap.clientHeight - 260));
+    tooltip.style.left = left + 'px';
+    tooltip.style.top  = top  + 'px';
+    const imgTag = pt.img
+      ? `<img src="${imgSrc(pt.img)}" alt="${pt.name || ''}" loading="lazy">`
+      : '';
+    tooltip.innerHTML =
+      imgTag +
+      (pt.name ? `<b style="font-size:11px;word-break:break-all">${pt.name}</b><br>` : '') +
+      `<span style="color:#bbb">${DATASET_FULL[pt.dataset] || pt.dataset}</span><br>` +
+      `<span style="color:#bbb">${SPLIT_STYLE[pt.split]?.label || pt.split}</span>`;
+    tooltip.style.display = 'block';
+  } else {
+    canvas.style.cursor = '';   // inherit crosshair from parent
+    if (hoveredPt) { hoveredPt = null; drawOverlay(); }
+    tooltip.style.display = 'none';
+  }
+});
+canvas.addEventListener('mouseleave', () => {
+  canvas.style.cursor = '';
+  hoveredPt = null;
+  drawOverlay();
+  tooltip.style.display = 'none';
+});
+
+// ── Touch tap → tooltip ───────────────────────────────────────────────────────
+let _touchT, _touchX, _touchY;
+canvas.addEventListener('touchstart', e => {
+  _touchT = Date.now();
+  _touchX = e.touches[0].clientX;
+  _touchY = e.touches[0].clientY;
+}, { passive: true });
+
+canvas.addEventListener('touchend', e => {
+  if (!qtree) return;
+  const dt = Date.now() - _touchT;
+  const dx = e.changedTouches[0].clientX - _touchX;
+  const dy = e.changedTouches[0].clientY - _touchY;
+  if (dt > 300 || Math.hypot(dx, dy) > 10) return;  // drag or long-press → skip
+
+  const rect = canvas.getBoundingClientRect();
+  const mx = _touchX - rect.left;
+  const my = _touchY - rect.top;
+  const px = (mx - transform.x) / transform.k;
+  const py = (my - transform.y) / transform.k;
+  const threshold = 16 / transform.k;
+  const pt = qtree.find(px, py, threshold);
+
+  if (pt && activeDsets.has(pt.dataset) && activeSplits.has(pt.split)) {
+    const imgTag = pt.img
+      ? `<img src="${imgSrc(pt.img)}" alt="${pt.name || ''}" loading="lazy">`
+      : '';
+    tooltip.innerHTML =
+      imgTag +
+      (pt.name ? `<b style="font-size:11px;word-break:break-all">${pt.name}</b><br>` : '') +
+      `<span style="color:#bbb">${DATASET_FULL[pt.dataset] || pt.dataset}</span><br>` +
+      `<span style="color:#bbb">${SPLIT_STYLE[pt.split]?.label || pt.split}</span>`;
+    tooltip.style.display = 'block';
+  } else {
+    tooltip.style.display = 'none';
+  }
+}, { passive: true });
+
+// Tap tooltip itself to dismiss on mobile
+tooltip.addEventListener('click', () => { tooltip.style.display = 'none'; });
+
+// ── Mobile sidebar toggle ─────────────────────────────────────────────────────
+(function() {
+  const btn      = document.getElementById('sidebar-toggle');
+  const sidebar  = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  function close() { sidebar.classList.remove('open'); backdrop.classList.remove('open'); }
+  btn.addEventListener('click', () => {
+    const open = sidebar.classList.toggle('open');
+    backdrop.classList.toggle('open', open);
+  });
+  backdrop.addEventListener('click', close);
+})();
+
+// ── Sidebar ───────────────────────────────────────────────────────────────────
+function buildSidebar(meta) {
+  const dsCounts = {};
+  allPoints.forEach(p => dsCounts[p.dataset] = (dsCounts[p.dataset]||0) + 1);
+
+  const dsDiv = document.getElementById('dataset-toggles');
+  meta.datasets.forEach(tag => {
+    const row = document.createElement('label');
+    row.className = 'ds-row';
+    row.innerHTML = `
+      <input type="checkbox" checked data-ds="${tag}">
+      <span class="ds-swatch" style="background:${DATASET_COLORS[tag]}"></span>
+      <span class="ds-name">${DATASET_FULL[tag]||tag}</span>
+      <span class="ds-count">${(dsCounts[tag]||0).toLocaleString()}</span>`;
+    row.querySelector('input').addEventListener('change', e => {
+      if (e.target.checked) activeDsets.add(tag); else activeDsets.delete(tag);
+      updateStats(); schedDraw();
+    });
+    dsDiv.appendChild(row);
+  });
+
+  const splitDiv = document.getElementById('split-toggles');
+  SPLIT_ORDER.forEach(sp => {
+    const s = SPLIT_STYLE[sp];
+    const row = document.createElement('label');
+    row.className = 'split-row';
+    row.innerHTML = `
+      <input type="checkbox" checked data-split="${sp}">
+      <span class="split-swatch" style="background:${s.color}"></span>
+      <span>${s.label}</span>`;
+    row.querySelector('input').addEventListener('change', e => {
+      if (e.target.checked) activeSplits.add(sp); else activeSplits.delete(sp);
+      updateStats(); schedDraw();
+    });
+    splitDiv.appendChild(row);
+  });
+
+  document.querySelectorAll('input[name=colormode]').forEach(r =>
+    r.addEventListener('change', e => { colorMode = e.target.value; schedDraw(); })
+  );
+  document.getElementById('select-all-ds').addEventListener('click', () => {
+    document.querySelectorAll('[data-ds]').forEach(cb => { cb.checked=true; activeDsets.add(cb.dataset.ds); });
+    updateStats(); schedDraw();
+  });
+  document.getElementById('deselect-all-ds').addEventListener('click', () => {
+    document.querySelectorAll('[data-ds]').forEach(cb => { cb.checked=false; activeDsets.delete(cb.dataset.ds); });
+    updateStats(); schedDraw();
+  });
+
+  updateStats();
+}
+
+function updateStats() {
+  const bySplit = {};
+  for (const p of allPoints) {
+    if (activeDsets.has(p.dataset) && activeSplits.has(p.split))
+      bySplit[p.split] = (bySplit[p.split]||0) + 1;
+  }
+  const total = Object.values(bySplit).reduce((a,b)=>a+b, 0);
+  document.getElementById('stats').innerHTML =
+    `<b>Visible:</b> ${total.toLocaleString()}<br>` +
+    SPLIT_ORDER.map(s => bySplit[s]
+      ? `<b>${SPLIT_STYLE[s].label.split('/')[0].trim()}:</b> ${bySplit[s].toLocaleString()}`
+      : '').filter(Boolean).join('<br>');
+}
+
+// ── Bootstrap ─────────────────────────────────────────────────────────────────
+function loadData(url) {
+  for (const key of Object.keys(gpuBuffers)) {
+    gl.deleteBuffer(gpuBuffers[key].buf);
+    delete gpuBuffers[key];
+  }
+  document.getElementById('dataset-toggles').innerHTML = '';
+  document.getElementById('split-toggles').innerHTML = '';
+  loading.style.display = 'flex';
+  tooltip.style.display = 'none';
+
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      allPoints    = data.points;
+      activeDsets  = new Set(data.meta.datasets);
+      activeSplits = new Set(SPLIT_ORDER);
+      loading.style.display = 'none';
+
+      document.getElementById('header-meta').textContent =
+        `${data.meta.model} · ${data.meta.n_points.toLocaleString()} points`;
+
+      buildSidebar(data.meta);
+      resize();
+      schedDraw();
+    })
+    .catch(err => {
+      loading.textContent = `Error loading ${url}`;
+      console.error(err);
+    });
+}
+
+document.querySelectorAll('input[name=modelfile]').forEach(r =>
+  r.addEventListener('change', e => loadData(DATA_FILES[e.target.value]))
+);
+
+buildZoom();
+loadData(DATA_FILES.clip);
+</script>
+</body>
+</html>
