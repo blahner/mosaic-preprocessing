@@ -79,15 +79,24 @@ To use the version of MOSAIC with 8 datasets in the original manuscript publishe
 2. Download the train-test json splits from ./train_test_splits/ 
 3. Download the stimulus sets from their original source (see detailed instructions below).
 
-a. Since it is common for stimulus sets to not be under a Creative Commons license, we do not host or distribute any stimulus sets. Please download the stimulus sets following the instructions of the original publication. We provide download scripts when possible or else point you to the download instructions below:
+a. Since it is common for stimulus sets to not be under a Creative Commons license, we do not host or distribute any stimulus sets. We provide a single script that automates downloads where possible and prints step-by-step instructions for datasets that require manual registration or browser-based downloads:
 
-- BOLD5000: https://bold5000-dataset.github.io/website/download.html
-- BOLD Moments Dataset (BMD): https://github.com/blahner/BOLDMomentsDataset
-- Generic Object Decoding (GOD) and Deeprecon (same stimulus set): https://github.com/KamitaniLab/GenericObjectDecoding and https://github.com/KamitaniLab/DeepImageReconstruction
-- Human Actions Dataset (HAD): https://openneuro.org/datasets/ds004488 and/or the script "src/fmriDatasetPreparation/datasets/HumanActionsDataset/download/ds004488-1.1.1_noderivatives.sh"
-- THINGS: Download all THINGS database images https://osf.io/jum2f/. Then this notebook copies the ones used in the fMRI study to other folder: "src/fmriDatasetPreparation/datasets/THINGS_fmri/download/identify_experimental_stimuli.ipynb". Alternatively, we provide a txt file of the list of 8740 stimuli "THINGS_fmri_filenames.txt" in case you don't want to download THINGS event files etc.
-- Natural Object Dataset (NOD): https://openneuro.org/datasets/ds004496 and/or the script "src/fmriDatasetPreparation/datasets/NaturalObjectDataset/download/download_nod_stimuli.sh"
-- Natural Scenes Dataset (NSD): https://natural-scenes-dataset.s3.amazonaws.com/index.html#nsddata_stimuli/stimuli/ 
+```
+source .env && bash src/stimulusSetPreparation/download_stimuli.sh
+```
+
+**Prerequisites:** AWS CLI installed (`pip install awscli` or via your package manager). Set `DATASETS_ROOT` in your `.env` file before running.
+
+The script handles each dataset as follows:
+- **BOLD5000**: prints instructions → https://bold5000-dataset.github.io/website/download.html
+- **BOLD Moments Dataset (BMD)**: prints instructions → https://github.com/blahner/BOLDMomentsDataset
+- **Generic Object Decoding (GOD) + Deeprecon** (shared stimulus set): prints instructions → https://github.com/KamitaniLab/GenericObjectDecoding and https://github.com/KamitaniLab/DeepImageReconstruction
+- **Human Actions Dataset (HAD)**: auto-downloads via `aws s3 sync` from OpenNeuro
+- **THINGS**: prints instructions → https://osf.io/jum2f/ (see also `src/fmriDatasetPreparation/datasets/THINGS_fmri/download/`)
+- **Natural Object Dataset (NOD)**: auto-downloads via `aws s3 sync` from OpenNeuro
+- **Natural Scenes Dataset (NSD)**: auto-downloads via `aws s3 cp` from the NSD S3 bucket (~39 GB for the stimuli HDF5)
+
+The script skips any dataset whose stimuli are already present, so it is safe to re-run after completing manual downloads.
 
 INPUTS: None  
 OUTPUTS: stimulus set downloaded in each dataset-specific folder.
@@ -173,6 +182,8 @@ src/stimulusSetPreparation/compile_datasets/compile_stiminfo_acrossdatasets.ipyn
 python src/stimulusSetPreparation/compile_datasets/make_testtrain_splits.py 
 src/stimulusSetPreparation/compile_datasets/testtrain_stats.ipynb #this notebook gives some stats about the composition of your test-train splits
 ```
+
+You can change the similarity threshold for your train-test split to be more or less strict depending on the needs of your analysis. Change the variable OUTLIER_CUTOFF in src/stimulusSetPreparation/compile_datasets/make_testtrain_splits.py to do this. Please read the manuscript's "Recommended Use and Limitations" section for guidance on choosing an appropriate train-test split.
 
 ### fMRI responses
 For each fMRI dataset separately:

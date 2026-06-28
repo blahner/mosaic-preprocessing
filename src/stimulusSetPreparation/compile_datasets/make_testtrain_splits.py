@@ -12,6 +12,8 @@ import json
 from pathlib import Path
 import argparse
 
+OUTLIER_CUTOFF = 0.8196 ## CHANGE ME if you want more/less strict train-test splits
+
 def main(args):
     save_root = os.path.join(args.dataset_root, "MOSAIC")
     compiled_stiminfo = pd.read_table(os.path.join(save_root, "stimuli", "datasets_stiminfo", "compiled_dataset_stiminfo.tsv"), low_memory=False)
@@ -150,16 +152,15 @@ def main(args):
         sorted_similarity_indices = np.argsort(similarity)[::-1] #sort high similarity to low similarity
         similarity_sorted = [similarity[i] for i in sorted_similarity_indices]
         
-        outlier_cutoff = 0.8196
         outlier_filenames = []
         outlier_scores = []
         outlier_indices = []
         for score, idx in zip(similarity_sorted, sorted_similarity_indices):
-            if score > outlier_cutoff:
+            if score > OUTLIER_CUTOFF:
                 outlier_filenames.append(train_filenames[idx])
                 outlier_scores.append(score)
                 outlier_indices.append(idx)
-        data_similarity[test_img]=(outlier_filenames, outlier_indices, outlier_scores, outlier_cutoff) 
+        data_similarity[test_img]=(outlier_filenames, outlier_indices, outlier_scores, OUTLIER_CUTOFF) 
 
     #use this file later to visualize similar images and exclude
     with open(os.path.join(save_root, f"top_similar_framemetric.pkl"), 'wb') as f:
@@ -169,7 +170,7 @@ def main(args):
     removed_filenames = {}
     numreps_lost = 0 #all lost reps here are from the training set
     for test_stim, outlier_tuple in data_similarity.items():
-        outlier_filenames, outlier_indices, outlier_scores, outlier_cutoff = outlier_tuple #if a similarity exceeds this threshold, discard it. This threshold is empirically determined by looking at the score between two frames of the same video but offset, which is ~0.88
+        outlier_filenames, outlier_indices, outlier_scores, _ = outlier_tuple #if a similarity exceeds this threshold, discard it. This threshold is empirically determined by looking at the score between two frames of the same video but offset, which is ~0.88
         high_sim_train = [] #multiple test images can have the same train stim that are too perceptuallly 'close'. this variable tracks which train stim actually got removed because of each test stim
         for filename in outlier_filenames:
             if filename in train.keys(): #the filename could have been previously deleted and not exist anymore
