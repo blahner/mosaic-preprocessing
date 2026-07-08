@@ -5,6 +5,7 @@
 *.mgh
 !mosaic_logo.png
 *.json
+*.mp4
 
 # numpy files
 *.npy
