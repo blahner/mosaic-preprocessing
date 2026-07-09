@@ -22,7 +22,7 @@ movie shows:
          matter = missed gyrus
        - Pial (red) and white-matter (cyan) surface contours overlaid
 
-  4. Animated BOLD time-series (short clip from run-1)
+  4. Animated BOLD time-series (clip covering every run of every session)
 
 Usage
 -----

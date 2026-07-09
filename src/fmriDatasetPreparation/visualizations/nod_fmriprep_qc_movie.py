@@ -22,7 +22,7 @@ movie shows:
          matter = missed gyrus
        - Pial (red) and white-matter (cyan) surface contours overlaid
 
-  4. Animated BOLD time-series (short clip from the first run of each session)
+  4. Animated BOLD time-series (clip covering every run of every session)
 
 NOD sessions map roughly 1:1 to task (ses-coco/ses-floc/ses-imagenet0X/
 ses-prf), with run counts that vary by session type and subject, and the
@@ -563,18 +563,16 @@ def make_surfaces_fig(sub, anat_dir):
 
 def make_bold_clip_frames(sub, sessions, tasks):
     """
-    Animated BOLD clip cycling through every session's first discovered
-    task/run. Samples every N-th volume so that ~BOLD_TARGET_VOLS frames are
+    Animated BOLD clip cycling through every run of every task in every
+    session. Samples every N-th volume so that ~BOLD_TARGET_VOLS frames are
     shown per run while covering the full time-series.  Colour limits are
     fixed from the first available run for visual consistency.
     """
     run_list = []  # (ses, task, run)
     for ses in sessions:
         for t in tasks:
-            runs = list_runs(sub, ses, t)
-            if runs:
-                run_list.append((ses, t, runs[0]))
-                break
+            for run in list_runs(sub, ses, t):
+                run_list.append((ses, t, run))
 
     if not run_list:
         return []
