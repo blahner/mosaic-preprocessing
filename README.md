@@ -246,9 +246,12 @@ python src/fmriDatasetPreparation/create_hdf5/create_hdf5_pkl.py --subjectID_dat
 Note that the .hdf5 files include all single trial beta estimates. Subsequent stimulus set filtering when you aggregate subjects/datasets into your MOSAIC dataset will output train and test set .json files that will simply not reference the stimuli and fMRI trials that get filtered out. But the .hdf5 files themselves are agnostic to this stimulus set filtering.
 
 #### fMRI Validation
-Finally, share some preprocessing validation reports. We recommend sharing fMRIPrep's output (or the equivalent if you are using a different pipeline) and noise ceiling estimates.
+Finally, share some preprocessing validation reports. We recommend sharing fMRIPrep's output (or the equivalent if you are using a different pipeline), noise ceiling estimates, and quality check movie summaries.
 - [fMRIPrep reports](https://drive.google.com/drive/folders/1HM_YeygB6IgxbGx_IalKFN66slG4Lxmo?usp=sharing)
 - [Noise ceiling estimates](https://drive.google.com/drive/folders/1CC2D9s9oI6UTaTbLdfmpp9VIPZAt9Uys?usp=sharing)
+- [preprocessing quality check movie](https://drive.google.com/drive/folders/1H0K-bM_7Z7_IO7oeg2oZfPes768Hhk6L?usp=sharing)
+
+The quality check movies and the noise ceiling estimates are a good way to get quick looks at the fMRI data quality at various stages of preprocessing. The fMRIPrep reports offer detailed and interactive .html reports for deeper dives into preprocessing quality.
 
 ### Upload single subject hdf5 files to the MOSAIC website
 Reach out to mosaicfmri@gmail.com for help uploading your dataset to the MOSAIC S3 bucket.

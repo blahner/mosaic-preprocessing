@@ -28,19 +28,20 @@ Unlike BOLDMomentsDataset, NSD subjects have up to 40 functional sessions
 (ses-nsd01 .. ses-nsd40, plus ses-nsdsynthetic) with variable run counts
 (12-14) and a session dedicated purely to anatomy (ses-nsdanat, no func/).
 Sessions/tasks/runs are therefore discovered dynamically by globbing rather
-than assumed from a fixed template, and by default only the main "nsdcore"
-task is included (use --tasks to add e.g. fixation/memory from
-ses-nsdsynthetic). With up to 40 sessions, --max_sessions evenly subsamples
-down to a manageable movie length by default.
+than assumed from a fixed template. By default both the main "nsdcore" task
+and ses-nsdsynthetic's "fixation"/"memory" tasks are included, so every
+functional session is covered. All sessions (up to 40) are included by
+default; pass --max_sessions to evenly subsample down to a shorter movie if
+desired.
 
 Usage
 -----
-  python nsd_fmriprep_qc_movie.py [--tasks nsdcore] [--max_sessions 8]
+  python nsd_fmriprep_qc_movie.py [--tasks nsdcore fixation memory] [--max_sessions N]
                                    [--subs sub-01 sub-02 ...]
 
 Output
 ------
-  OUT_DIR / NaturalScenesDataset_<subs>_qc_small.mp4
+  OUT_DIR / NaturalScenesDataset_<subs>_qc.mp4
 """
 
 import argparse
@@ -62,8 +63,10 @@ DATASET_NAME = "NaturalScenesDataset"
 FMRIPREP = Path(os.getenv("DATASETS_ROOT")) / "NaturalScenesDataset/derivatives/fmriprep"
 OUT_DIR  = Path(os.getenv("PROJECT_ROOT")) / "src/fmriDatasetPreparation/visualizations/output/qc"
 
-DEFAULT_TASKS = ["nsdcore"]   # main experimental task; ses-nsdsynthetic's
-                               # fixation/memory tasks are excluded by default
+DEFAULT_TASKS = ["nsdcore", "fixation", "memory"]   # nsdcore is the main
+                               # experimental task; fixation/memory are
+                               # ses-nsdsynthetic's tasks, included so that
+                               # session isn't dropped by default
 
 FPS      = 4          # frames per second for the output movie
 DPI      = 120       # figure DPI  (figsize=(16,9) → 1920×1080)
@@ -349,7 +352,7 @@ def make_run_summary_fig(sub, sessions, tasks):
                 ses_ids.append(sessions.index(ses))
 
     x = np.arange(len(run_labels))
-    cmap = plt.cm.get_cmap("tab10", len(sessions))
+    cmap = plt.cm.get_cmap("tab20", len(sessions))
     colors = [cmap(s) for s in ses_ids]
 
     fig, axes = plt.subplots(2, 1, figsize=FIG_SIZE, sharex=True)
@@ -375,17 +378,37 @@ def make_run_summary_fig(sub, sessions, tasks):
         ax.tick_params(colors="white")
         for sp in ax.spines.values(): sp.set_edgecolor("white")
 
+    # Figure-level legend, with column count adapted to label length so it
+    # stays within the canvas width for any session-name style (short
+    # "nsd01" vs. long "perceptionNaturalImageTraining13"), and stacked in
+    # rows (reserved via measured height) instead of a single axes-anchored
+    # row — a wide single-row legend previously forced tight_layout to
+    # squeeze the plot axes down to a sliver to keep the legend on-canvas.
+    labels = [(ses or "sub").removeprefix("ses-") for ses in sessions]
+    avg_len = sum(len(l) for l in labels) / len(labels)
+    row_budget = 150  # empirical char-budget that fits FIG_SIZE width at fontsize~6.5
+    ncol = max(1, min(len(sessions), round(row_budget / (avg_len + 3))))
     handles = [plt.Line2D([0], [0], marker="o", color="w",
-                           markerfacecolor=cmap(i), markersize=8, label=(ses or "sub"))
-               for i, ses in enumerate(sessions)]
-    axes[0].legend(handles=handles, facecolor="#333333", labelcolor="white",
-                   fontsize=8, ncol=min(len(sessions), 8))
+                           markerfacecolor=cmap(i), markersize=5, label=labels[i])
+               for i in range(len(sessions))]
+    legend = fig.legend(handles=handles, facecolor="#333333", labelcolor="white",
+                         fontsize=6.5, ncol=ncol, loc="upper center",
+                         bbox_to_anchor=(0.5, 1.0), frameon=True, columnspacing=1.0,
+                         handletextpad=0.4)
 
+    # Measure the legend's actual rendered height (in figure-fraction
+    # coords) instead of guessing a per-row margin, so the title/axes
+    # placement below it stays correct for any session count.
+    fig.canvas.draw()
+    legend_bottom_fig = legend.get_window_extent(fig.canvas.get_renderer()) \
+        .transformed(fig.transFigure.inverted()).y0
+    title_y = legend_bottom_fig - 0.02
     fig.suptitle(
         f"{sub}  |  Per-run motion & signal quality across all sessions\n"
         "flat lines = consistent preprocessing; dots coloured by session",
-        color="white", fontsize=13)
-    plt.tight_layout()
+        color="white", fontsize=13, y=title_y, va="top")
+
+    plt.tight_layout(rect=[0, 0, 1, title_y - 0.06])
     return fig
 
 
@@ -676,11 +699,10 @@ def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--tasks", nargs="*", default=DEFAULT_TASKS,
                    help=f"task labels to include (default: {DEFAULT_TASKS})")
-    p.add_argument("--max_sessions", type=int, default=8,
-                   help="cap on functional sessions per subject, evenly "
-                        "sampled across all available sessions (default: 8; "
-                        "use a large number or omit sessions cap logic to "
-                        "cover every session)")
+    p.add_argument("--max_sessions", type=int, default=None,
+                   help="optional cap on functional sessions per subject, "
+                        "evenly sampled across all available sessions "
+                        "(default: None, i.e. every session is included)")
     p.add_argument("--subs", nargs="*", default=None,
                    help="subjects to include (default: all found in FMRIPREP dir)")
     return p.parse_args()

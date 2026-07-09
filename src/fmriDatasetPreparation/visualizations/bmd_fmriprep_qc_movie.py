@@ -26,7 +26,7 @@ movie shows:
 
 Usage
 -----
-  python bmd_fmriprep_qc_movie.py [--task train] [--n_runs 10]
+  python bmd_fmriprep_qc_movie.py [--tasks train test] [--n_runs 10]
                                    [--subs sub-01 sub-02 ...]
 
 Output
@@ -51,9 +51,10 @@ import SimpleITK as sitk
 FMRIPREP = Path(os.getenv("DATASETS_ROOT")) / "BOLDMomentsDataset/derivatives/versionC/fmriprep"
 OUT_DIR  = Path(os.getenv("PROJECT_ROOT")) / "src/fmriDatasetPreparation/visualizations/output/qc"
 ANAT_SES = "ses-01"
+DEFAULT_TASKS = ["train", "test"]
 
 FPS      = 4          # frames per second for the output movie
-DPI      = 40        # figure DPI  (figsize=(16,9) → 640×360)
+DPI      = 120        # figure DPI  (figsize=(16,9) → 640×360)
 FIG_SIZE = (16, 9)
 
 # matplotlib's default figure.dpi (100) overrides FIG_SIZE*DPI on every
@@ -166,8 +167,8 @@ def make_title_fig(sub):
     return fig
 
 
-def make_tsnr_fig(sub, task, n_runs):
-    """tSNR map for every session (all runs pooled within session) — one slide per session."""
+def make_tsnr_fig(sub, tasks, n_runs):
+    """tSNR map for every session (all tasks/runs pooled within session) — one slide per session."""
     sessions = sorted(
         d.name for d in (FMRIPREP / sub).iterdir()
         if d.is_dir() and d.name.startswith("ses-") and d.name != ANAT_SES
@@ -177,18 +178,19 @@ def make_tsnr_fig(sub, task, n_runs):
     for ses in sessions:
         sum_arr = sum_sq_arr = None
         count = 0
-        for run_i in range(1, n_runs + 1):
-            p = FMRIPREP / sub / ses / "func" / (
-                f"{sub}_{ses}_task-{task}_run-{run_i}"
-                "_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz")
-            if not p.exists():
-                continue
-            data, _ = load_bold(p)
-            if sum_arr is None:
-                sum_arr = data.sum(3); sum_sq_arr = (data**2).sum(3)
-            else:
-                sum_arr += data.sum(3); sum_sq_arr += (data**2).sum(3)
-            count += data.shape[3]
+        for task in tasks:
+            for run_i in range(1, n_runs + 1):
+                p = FMRIPREP / sub / ses / "func" / (
+                    f"{sub}_{ses}_task-{task}_run-{run_i}"
+                    "_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz")
+                if not p.exists():
+                    continue
+                data, _ = load_bold(p)
+                if sum_arr is None:
+                    sum_arr = data.sum(3); sum_sq_arr = (data**2).sum(3)
+                else:
+                    sum_arr += data.sum(3); sum_sq_arr += (data**2).sum(3)
+                count += data.shape[3]
         if sum_arr is None:
             continue
         mean  = sum_arr / count
@@ -203,7 +205,7 @@ def make_tsnr_fig(sub, task, n_runs):
         im = ax.imshow(tsnr[:, :, cz].T, origin="lower", cmap="hot", vmin=0, vmax=100)
         med = np.median(tsnr[brain])
         fig.suptitle(
-            f"{sub}  |  Temporal SNR — {ses}  task-{task}  (all runs pooled)\n"
+            f"{sub}  |  Temporal SNR — {ses}  tasks-{'+'.join(tasks)}  (all runs pooled)\n"
             f"z={cz}   {count} vols   median tSNR = {med:.1f}",
             color="white", fontsize=13)
         ax.axis("off")
@@ -219,7 +221,7 @@ def make_tsnr_fig(sub, task, n_runs):
     return figs
 
 
-def make_run_summary_fig(sub, task, n_runs):
+def make_run_summary_fig(sub, tasks, n_runs):
     """Per-run mean FD and mean std-DVARS across ALL sessions — one dot per run."""
     sessions = sorted(
         d.name for d in (FMRIPREP / sub).iterdir()
@@ -231,21 +233,22 @@ def make_run_summary_fig(sub, task, n_runs):
 
     for ses in sessions:
         first = True
-        for run_i in range(1, n_runs + 1):
-            p = FMRIPREP / sub / ses / "func" / (
-                f"{sub}_{ses}_task-{task}_run-{run_i}_desc-confounds_timeseries.tsv")
-            if not p.exists():
-                continue
-            df = pd.read_csv(p, sep="\t")
-            fd_vals = df["framewise_displacement"].dropna().values.astype(float)
-            dv_vals = df["std_dvars"].dropna().values.astype(float)
-            if first:
-                session_boundaries.append(len(run_labels))
-                first = False
-            run_labels.append(f"{ses}\nrun-{run_i}")
-            mean_fd.append(fd_vals.mean())
-            mean_dvars.append(dv_vals.mean() if len(dv_vals) else np.nan)
-            ses_ids.append(sessions.index(ses))
+        for task in tasks:
+            for run_i in range(1, n_runs + 1):
+                p = FMRIPREP / sub / ses / "func" / (
+                    f"{sub}_{ses}_task-{task}_run-{run_i}_desc-confounds_timeseries.tsv")
+                if not p.exists():
+                    continue
+                df = pd.read_csv(p, sep="\t")
+                fd_vals = df["framewise_displacement"].dropna().values.astype(float)
+                dv_vals = df["std_dvars"].dropna().values.astype(float)
+                if first:
+                    session_boundaries.append(len(run_labels))
+                    first = False
+                run_labels.append(f"{ses}\n{task}-{run_i}")
+                mean_fd.append(fd_vals.mean())
+                mean_dvars.append(dv_vals.mean() if len(dv_vals) else np.nan)
+                ses_ids.append(sessions.index(ses))
 
     x = np.arange(len(run_labels))
     cmap = plt.cm.get_cmap("tab10", len(sessions))
@@ -281,14 +284,14 @@ def make_run_summary_fig(sub, task, n_runs):
                    fontsize=8, ncol=len(sessions))
 
     fig.suptitle(
-        f"{sub}  |  Per-run motion & signal quality across all sessions — task-{task}\n"
+        f"{sub}  |  Per-run motion & signal quality across all sessions — tasks-{'+'.join(tasks)}\n"
         "flat lines = consistent preprocessing; dots coloured by session",
         color="white", fontsize=13)
     plt.tight_layout()
     return fig
 
 
-def make_registration_fig(sub, task):
+def make_registration_fig(sub, tasks):
     """
     BOLD → T1w coregistration quality: one slide per session.
 
@@ -312,11 +315,19 @@ def make_registration_fig(sub, task):
 
     figs = []
     for ses in sessions:
-        ref_path = FMRIPREP / sub / ses / "func" / (
-            f"{sub}_{ses}_task-{task}_run-1_desc-coreg_boldref.nii.gz")
-        xfm_path = FMRIPREP / sub / ses / "func" / (
-            f"{sub}_{ses}_task-{task}_run-1_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt")
-        if not ref_path.exists() or not xfm_path.exists():
+        # Registration quality doesn't depend on which task the reference
+        # run came from, so just use the first task (in caller order) that
+        # has a run-1 boldref/xfm pair for this session.
+        ref_path = xfm_path = task = None
+        for t in tasks:
+            rp = FMRIPREP / sub / ses / "func" / (
+                f"{sub}_{ses}_task-{t}_run-1_desc-coreg_boldref.nii.gz")
+            xp = FMRIPREP / sub / ses / "func" / (
+                f"{sub}_{ses}_task-{t}_run-1_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt")
+            if rp.exists() and xp.exists():
+                ref_path, xfm_path, task = rp, xp, t
+                break
+        if ref_path is None:
             continue
 
         boldref_img = nib.load(str(ref_path))
@@ -439,9 +450,9 @@ def make_surfaces_fig(sub):
 # Animated BOLD frames
 # ---------------------------------------------------------------------------
 
-def make_bold_clip_frames(sub, task, n_runs):
+def make_bold_clip_frames(sub, tasks, n_runs):
     """
-    Animated BOLD clip cycling through every session and run.
+    Animated BOLD clip cycling through every session, task, and run.
     Samples every N-th volume so that ~BOLD_TARGET_VOLS frames are shown per run
     while covering the full time-series.  Colour limits are fixed from the first
     available run for visual consistency.
@@ -455,18 +466,21 @@ def make_bold_clip_frames(sub, task, n_runs):
     vmin = vmax = None
     z_slices = None
     for ses in sessions:
-        p = FMRIPREP / sub / ses / "func" / (
-            f"{sub}_{ses}_task-{task}_run-1"
-            "_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz")
-        if not p.exists():
-            continue
-        data, _ = load_bold(p)
-        brain = data.mean(3) > 0.1 * data.mean()
-        _, _, cz = center_slices(brain.astype(float))
-        z_slices = np.clip([cz - 8, cz, cz + 8], 0, data.shape[2] - 1)
-        bv = data[brain]
-        vmin, vmax = np.percentile(bv, 2), np.percentile(bv, 98)
-        break
+        for task in tasks:
+            p = FMRIPREP / sub / ses / "func" / (
+                f"{sub}_{ses}_task-{task}_run-1"
+                "_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz")
+            if not p.exists():
+                continue
+            data, _ = load_bold(p)
+            brain = data.mean(3) > 0.1 * data.mean()
+            _, _, cz = center_slices(brain.astype(float))
+            z_slices = np.clip([cz - 8, cz, cz + 8], 0, data.shape[2] - 1)
+            bv = data[brain]
+            vmin, vmax = np.percentile(bv, 2), np.percentile(bv, 98)
+            break
+        if z_slices is not None:
+            break
 
     if z_slices is None:
         return []
@@ -478,29 +492,30 @@ def make_bold_clip_frames(sub, task, n_runs):
         ax.set_facecolor("black")
 
     for ses in sessions:
-        for run_i in range(1, n_runs + 1):
-            p = FMRIPREP / sub / ses / "func" / (
-                f"{sub}_{ses}_task-{task}_run-{run_i}"
-                "_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz")
-            if not p.exists():
-                continue
-            data, _ = load_bold(p)
-            n_vols = data.shape[3]
-            step = max(1, n_vols // BOLD_TARGET_VOLS)
-            vol_indices = range(0, n_vols, step)
-            for t in vol_indices:
-                for zi, ax in zip(z_slices, axes):
-                    ax.clear()
-                    ax.imshow(data[:, :, zi, t].T, origin="lower", cmap="gray",
-                              vmin=vmin, vmax=vmax, interpolation="nearest")
-                    ax.set_title(f"z={zi}", color="white", fontsize=9)
-                    ax.axis("off")
-                    ax.set_facecolor("black")
-                fig.suptitle(
-                    f"{sub}  |  {ses}  task-{task}  run-{run_i}   "
-                    f"vol {t+1}/{n_vols}  (every {step}th)",
-                    color="white", fontsize=12)
-                frames.append(fig_to_array(fig))
+        for task in tasks:
+            for run_i in range(1, n_runs + 1):
+                p = FMRIPREP / sub / ses / "func" / (
+                    f"{sub}_{ses}_task-{task}_run-{run_i}"
+                    "_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz")
+                if not p.exists():
+                    continue
+                data, _ = load_bold(p)
+                n_vols = data.shape[3]
+                step = max(1, n_vols // BOLD_TARGET_VOLS)
+                vol_indices = range(0, n_vols, step)
+                for t in vol_indices:
+                    for zi, ax in zip(z_slices, axes):
+                        ax.clear()
+                        ax.imshow(data[:, :, zi, t].T, origin="lower", cmap="gray",
+                                  vmin=vmin, vmax=vmax, interpolation="nearest")
+                        ax.set_title(f"z={zi}", color="white", fontsize=9)
+                        ax.axis("off")
+                        ax.set_facecolor("black")
+                    fig.suptitle(
+                        f"{sub}  |  {ses}  task-{task}  run-{run_i}   "
+                        f"vol {t+1}/{n_vols}  (every {step}th)",
+                        color="white", fontsize=12)
+                    frames.append(fig_to_array(fig))
 
     plt.close(fig)
     return frames
@@ -510,7 +525,7 @@ def make_bold_clip_frames(sub, task, n_runs):
 # Per-subject frame sequence
 # ---------------------------------------------------------------------------
 
-def subject_frames(sub, task, n_runs):
+def subject_frames(sub, tasks, n_runs):
     print(f"\n{'='*60}\n  {sub}\n{'='*60}")
     frames = []
 
@@ -530,13 +545,13 @@ def subject_frames(sub, task, n_runs):
 
     # (2) Per-run motion & signal quality
     print("  run summary (all sessions) …")
-    fig = make_run_summary_fig(sub, task, n_runs)
+    fig = make_run_summary_fig(sub, tasks, n_runs)
     frames += hold(fig_to_array(fig), HOLD_PANEL)
     plt.close(fig)
 
     # (3) Temporal SNR — one slide per session
     print("  tSNR (all sessions) …")
-    for ses, fig in make_tsnr_fig(sub, task, n_runs):
+    for ses, fig in make_tsnr_fig(sub, tasks, n_runs):
         print(f"    {ses}")
         frames += hold(fig_to_array(fig), HOLD_PANEL)
         plt.close(fig)
@@ -544,7 +559,7 @@ def subject_frames(sub, task, n_runs):
     # (4) BOLD → T1w registration — one slide per session
     print("  registration (all sessions) …")
     try:
-        for ses, fig in make_registration_fig(sub, task):
+        for ses, fig in make_registration_fig(sub, tasks):
             print(f"    {ses}")
             frames += hold(fig_to_array(fig), HOLD_PANEL)
             plt.close(fig)
@@ -552,8 +567,8 @@ def subject_frames(sub, task, n_runs):
         print(f"    skipped ({e})")
 
     # (5) Animated EPI volumes
-    print("  BOLD clip (all sessions, all runs) …")
-    frames += make_bold_clip_frames(sub, task, n_runs)
+    print("  BOLD clip (all sessions, all tasks, all runs) …")
+    frames += make_bold_clip_frames(sub, tasks, n_runs)
 
     return frames
 
@@ -564,7 +579,8 @@ def subject_frames(sub, task, n_runs):
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--task",   default="train")
+    p.add_argument("--tasks",  nargs="*", default=DEFAULT_TASKS,
+                   help=f"task labels to include (default: {DEFAULT_TASKS})")
     p.add_argument("--n_runs", type=int, default=10)
     p.add_argument("--subs",   nargs="*", default=None,
                    help="subjects to include (default: all found in FMRIPREP dir)")
@@ -584,14 +600,14 @@ def main():
     print(f"Subjects: {subjects}")
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    dataset   = FMRIPREP.parts[-3]          # BOLDMomentsDataset
+    dataset   = "BOLDMomentsDataset"       # BOLDMomentsDataset
     sub_tag   = "_".join(args.subs) if args.subs else "all"
     out_path  = OUT_DIR / f"{dataset}_{sub_tag}_qc.mp4"
 
     # Collect all frames (list of HxWx3 uint8 arrays)
     all_frames = []
     for sub in subjects:
-        all_frames.extend(subject_frames(sub, args.task, args.n_runs))
+        all_frames.extend(subject_frames(sub, args.tasks, args.n_runs))
 
     if not all_frames:
         print("No frames generated — check paths.")
