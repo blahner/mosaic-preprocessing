@@ -33,42 +33,49 @@ visual-QC-movie-free sanity check. A flagged run is a strong prior that its
 functional data has a real spatial normalization error — worth spot-checking
 in the QC movie, not an automatic verdict.
 
-## 2. Single-subject reprocessing pattern (never overwrite existing derivatives)
+## 2. `reprocess_bmd_subject.sh` — full pipeline, one launch, never overwrites
 
-To test a preprocessing fix on one subject without disturbing existing
-results for the rest of the dataset:
+Runs fMRIPrep → coreg-determinant QA gate → GLMsingle (all 4 sessions) →
+organize_betas → noiseceiling_compare → QC movie for **one subject** as a
+single blocking script:
 
-1. **New derivatives version, not in place.** Copy the dataset's
-   `fmriprep/run_fmriprep_single*.sh`, restrict the subject loop to the one
-   subject being tested, point `OUTPUT_RELPATH` at a new sibling version
-   directory (e.g. `versionD` next to `versionC`), and change only the
-   parameter under test. Use a dedicated `WORK` dir too so it can't collide
-   with a concurrent/previous run. Pre-create the docker bind-mount output
-   directory yourself (`mkdir -p .../fmriprep`) before `docker run` — on this
-   filesystem, letting Docker auto-create the bind-mount source can hit an
-   NFS permission error.
-   Worked example: see `datasets/BOLDMomentsDataset/fmriprep/` — the sub-05
-   `--bold2t1w-dof 6` test used this exact pattern against `versionD`.
-2. **Downstream scripts take `--version` (default `versionC`).**
-   `datasets/BOLDMomentsDataset/GLM/glmsingle_bmd.py`,
-   `organize_betas.py`, and `visualizations/bmd_fmriprep_qc_movie.py` all
-   accept `--version <name>` to read/write a non-default derivatives version,
-   with `versionC` as the default so every existing invocation is unaffected.
-   Apply the same one-line parameterization to other datasets' GLM/QC
-   scripts before running a similar single-subject test on them.
-3. **Noise ceiling: use `noiseceiling_compare.py`, not the notebook.**
-   `noiseceiling_bmd.ipynb` loops over all 10 subjects and writes directly
-   into the shared `$DATASETS_ROOT/MOSAIC/noiseceilings/` aggregate — running
-   it unmodified during a single-subject test would overwrite production
-   noise-ceiling files for every subject. `validation/noiseceiling_compare.py`
-   computes noise ceiling for one subject against one derivatives version and
-   writes into that version's own `GLM/<subject>/noiseceiling/` folder
-   instead, so before/after arrays can be diffed directly without touching
-   `MOSAIC/noiseceilings/`.
-4. **QC movie**: `bmd_fmriprep_qc_movie.py --subs sub-XX --version versionD`
-   writes to a version-tagged filename (`..._versionD_qc.mp4`) so it can't
-   clobber the dataset-wide `..._all_qc.mp4`.
+```bash
+src/fmriDatasetPreparation/qa/reprocess_bmd_subject.sh <subject_num e.g. 05> <new_version e.g. versionD> [extra fmriprep args...]
+# e.g. the sub-05 dof=6 test:
+src/fmriDatasetPreparation/qa/reprocess_bmd_subject.sh 05 versionD --bold2t1w-dof 6
+```
 
-None of this touches `versionC` (or any dataset's primary derivatives) at any
-point — it's an entirely parallel tree, disposable if the test doesn't pan
-out.
+Because `docker run` blocks until fMRIPrep finishes and every downstream step
+is a plain CLI call, this whole chain can be launched **once** in the
+background and produces a single completion notification at the end —
+important for agentic use: chaining separate backgrounded stages by hand
+(fmriprep, *then* notice it finished, *then* launch GLMsingle, ...) across
+turns is fragile — a stage can finish while something else is being handled
+and its completion notification gets missed, silently stalling the pipeline
+for hours until someone asks "is this still running?". One script, one
+launch, no stage to forget.
+
+It refuses to run if the target `derivatives/<version>` already exists (so
+it can never overwrite `versionC` or any prior test version), and the coreg
+QA gate does not halt the pipeline on flagged runs (`set -e` would abort the
+whole script) — it writes a report and continues, since a flagged run is a
+strong prior worth a human look, not an automatic verdict.
+
+Adapting this to another dataset: copy the script, swap in that dataset's
+`fmriprep/run_*.sh` docker invocation and GLM/validation script paths. The
+three things every dataset's copy needs are the same ones already applied to
+BMD's scripts:
+- A `--version` flag (default the dataset's current primary version, e.g.
+  `versionC`) on its `glmsingle_*.py`, `organize_betas*.py`, and
+  `*_fmriprep_qc_movie.py`, so every existing invocation stays unaffected.
+- A single-subject noise-ceiling script instead of the dataset's notebook —
+  check first whether that dataset's noise-ceiling notebook writes into the
+  shared `$DATASETS_ROOT/MOSAIC/noiseceilings/` aggregate for all subjects
+  (BMD's does); if so, running it unmodified during a single-subject test
+  would overwrite every other subject's production noise-ceiling file.
+- Pre-create the docker bind-mount output dir (`mkdir -p .../fmriprep`)
+  before `docker run` — on this filesystem, letting Docker auto-create it
+  hits an NFS permission error.
+
+None of this touches a dataset's primary derivatives version at any point —
+it's an entirely parallel tree, disposable if the test doesn't pan out.

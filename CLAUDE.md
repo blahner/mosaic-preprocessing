@@ -25,6 +25,8 @@ Required env vars (`.env`, loaded via `python-dotenv` in `src/utils/*.py`):
 
 fMRIPrep runs via Docker — see `fmriDatasetPreparation/datasets/<DATASET>/fmriprep/run_fmriprep_single.sh`. `FREESURFER_HOME` must be set (either in `.env` or shell rc). No test suite exists in this repo.
 
+All non-Docker pipeline scripts (GLMsingle, organize_betas, noise ceiling, QA scripts) must run in the `mosaic-preprocessing` conda env — it's the only env with `GLMsingle`/`hcp_utils`/`nilearn` installed alongside the `requirements.txt`-pinned `numpy==1.26.4`. On at least this machine, bare `python3` and even `conda run -n mosaic-preprocessing python3` silently resolve to a *different* conda env because another env's `bin/` is prepended to `$PATH` ahead of the base conda install (not from this repo's `.bashrc` block — some other shell init). Don't trust `conda activate`/`conda run` here without verifying `python3 -c "import sys; print(sys.prefix)"` actually prints `.../envs/mosaic-preprocessing`; when in doubt, invoke the env's binary by its full path, e.g. `/data/vision/oliva/blahner/anaconda3/envs/mosaic-preprocessing/bin/python3`.
+
 ## Architecture
 
 ### Two parallel top-level pipelines under `src/`
@@ -43,6 +45,7 @@ Cross-dataset steps live directly under `fmriDatasetPreparation/`:
 - `create_hdf5/create_hdf5_pkl.py` — compiles one subject's betas + noise ceiling into a MOSAIC-compliant `.hdf5` (invoked with `--subjectID_dataset sub-XX_DATASET`)
 - `create_hdf5/merge_hdf5_ind.py` vs `merge_hdf5_chunks.py` — merge single-subject hdf5s into one aggregate file, optimized for individual-trial access vs batch/chunk access respectively (pick based on downstream access pattern, e.g. model training vs bulk loading)
 - `visualizations/*_fmriprep_qc_movie.py` — one QC-movie script per dataset (see below)
+- `qa/` — cross-dataset QA tooling, e.g. `coreg_determinant_check.py` (flags fMRIPrep runs whose BOLD→T1w coregistration determinant is a robust per-subject outlier — every dataset's fmriprep script passes the non-default `--bold2t1w-dof 12`, which occasionally lets a run's registration collapse to a spurious affine scale instead of pure rigid motion). See `qa/README.md` for the single-subject reprocessing pattern (new `derivatives/versionX`, never overwrite an existing version) used to test a preprocessing fix on one subject without touching the rest of a dataset.
 
 **`stimulusSetPreparation/`** — stimulus-side pipeline, independent of the fMRI pipeline until the final compile step:
 1. `download_stimuli.sh` — per-dataset download/instructions (most stimulus sets aren't redistributable — this repo never hosts stimuli itself)

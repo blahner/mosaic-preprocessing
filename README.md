@@ -69,6 +69,11 @@ Your path to this repository will likely be in a different directory entirely an
 
 If you want to run the fMRIPrep scripts, follow [fMRIPrep's installation guide](https://fmriprep.org/en/stable/installation.html). The provided scripts run fMRIPrep in a docker container. Note that the environment variable FREESURFER_HOME is used in the fMRIPrep scripts and can be set in either this project's .env file or in your shell RC file (e.g., ~/.bashrc, ~/.zshrc) since it may apply to more than just this project.
 
+fMRIPrep and GLMsingle runs take hours. If you're driving this pipeline through Claude Code on a remote server (e.g. via [Remote Control](https://docs.claude.com/en/docs/claude-code) from the mobile app) and want to disconnect your terminal/SSH session without killing the job, start Claude Code inside `tmux` (or `screen`) first so it survives the disconnect:
+```
+tmux new-session -d -s claude "claude remote-control --name 'My Project'"
+```
+
 [Human Connectome Workbench](https://www.humanconnectome.org/software/connectome-workbench) and [HCP-utils](https://rmldj.github.io/hcp-utils/) provide useful functions for preprocessing, visualization, and analysis, especially in the fsLR32k space. Follow their installation instructions linked above.
 
 You can use the MOSAIC dataset as-is from the MOSAIC [manuscript](TODO) or you can preprocess your own dataset to add to it. See the relevant sections below
