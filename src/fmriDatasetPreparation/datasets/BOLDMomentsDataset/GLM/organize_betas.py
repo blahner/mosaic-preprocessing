@@ -8,7 +8,7 @@ import json
 import pandas as pd
 
 def main(args):
-    fmri_path = os.path.join(args.dataset_root,"derivatives", "versionC", "GLM")
+    fmri_path = os.path.join(args.dataset_root,"derivatives", args.version, "GLM")
 
     #load stimulus annotations to convert XXXX.mp4 filename to original Moments In Time Filename
     annotations = json.load(open(os.path.join(args.dataset_root,"derivatives", "stimuli_metadata", "annotations.json"), 'r'))
@@ -109,6 +109,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", "--subject", type=int, required=True, help="The subject from 1-10 that you wish to process")
     parser.add_argument("-d", "--dataset_root", default=dataset_root_default, help="The root path to the dataset directory. Specifying path here overwrites environment variable.")
+    parser.add_argument("--version", default="versionC", help="Derivatives version subdirectory to read/write GLM outputs (default: versionC).")
     parser.add_argument("-v", "--verbose", action="store_true", help="Print verbose")
     args = parser.parse_args()
 

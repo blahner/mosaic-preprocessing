@@ -34,7 +34,7 @@ def main(args):
         print("#" * 20)
         print("Starting GLMsingle on main experimental data for subject {} session {}".format(subject, session))
         print("#" * 20)
-    sub_func_root = os.path.join(args.dataset_root, "derivatives", "versionC", "fmriprep", subject, session, "func")
+    sub_func_root = os.path.join(args.dataset_root, "derivatives", args.version, "fmriprep", subject, session, "func")
 
     data = []
     design = []
@@ -103,7 +103,7 @@ def main(args):
     opt['wantfileoutputs'] = [0,0,0,1]
     opt['wantmemoryoutputs'] = [0,0,0,1]
 
-    outputdir_glmsingle = os.path.join(args.dataset_root, "derivatives", "versionC", "GLM", subject, session)
+    outputdir_glmsingle = os.path.join(args.dataset_root, "derivatives", args.version, "GLM", subject, session)
     if not os.path.exists(outputdir_glmsingle):
         os.makedirs(outputdir_glmsingle)
 
@@ -153,6 +153,7 @@ if __name__ == '__main__':
     parser.add_argument("-s", "--subject", type=int, required=True, help="The subject from 1-10 that you wish to process")
     parser.add_argument("-i", "--session", type=int, required=True, help="The session you want to perform glmsingle on.")
     parser.add_argument("-d", "--dataset_root", default=dataset_root_default, help="The root path to the dataset directory. Specifying path here overwrites environment variable.")
+    parser.add_argument("--version", default="versionC", help="Derivatives version subdirectory to read fmriprep outputs from / write GLM outputs to (default: versionC).")
     parser.add_argument("-v", "--verbose", action="store_true", help="Print verbose")
     args = parser.parse_args()
 

@@ -50,6 +50,9 @@ import SimpleITK as sitk
 # ---------------------------------------------------------------------------
 FMRIPREP = Path(os.getenv("DATASETS_ROOT")) / "BOLDMomentsDataset/derivatives/versionC/fmriprep"
 OUT_DIR  = Path(os.getenv("PROJECT_ROOT")) / "src/fmriDatasetPreparation/visualizations/output/qc"
+# FMRIPREP is re-pointed at --version in main() before any panel-building
+# function runs; the versionC default above is only used when --version is
+# not passed, so all pre-existing single-arg invocations keep working.
 ANAT_SES = "ses-01"
 DEFAULT_TASKS = ["train", "test"]
 
@@ -584,11 +587,15 @@ def parse_args():
     p.add_argument("--n_runs", type=int, default=10)
     p.add_argument("--subs",   nargs="*", default=None,
                    help="subjects to include (default: all found in FMRIPREP dir)")
+    p.add_argument("--version", default="versionC",
+                   help="derivatives version subdirectory to read fmriprep outputs from (default: versionC)")
     return p.parse_args()
 
 
 def main():
+    global FMRIPREP
     args = parse_args()
+    FMRIPREP = Path(os.getenv("DATASETS_ROOT")) / f"BOLDMomentsDataset/derivatives/{args.version}/fmriprep"
 
     if args.subs:
         subjects = args.subs
@@ -602,7 +609,8 @@ def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     dataset   = "BOLDMomentsDataset"       # BOLDMomentsDataset
     sub_tag   = "_".join(args.subs) if args.subs else "all"
-    out_path  = OUT_DIR / f"{dataset}_{sub_tag}_qc.mp4"
+    version_tag = "" if args.version == "versionC" else f"_{args.version}"
+    out_path  = OUT_DIR / f"{dataset}_{sub_tag}{version_tag}_qc.mp4"
 
     # Collect all frames (list of HxWx3 uint8 arrays)
     all_frames = []
