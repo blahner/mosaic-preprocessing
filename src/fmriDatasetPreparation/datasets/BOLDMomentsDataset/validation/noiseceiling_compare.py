@@ -10,6 +10,7 @@ files used by the rest of MOSAIC.
 
 Output: derivatives/<version>/GLM/sub-XX/noiseceiling/
     sub-XX_BMD_phase-{task}_n-{n}_noiseceiling.npy
+    sub-XX_BMD_phase-{task}_n-{n}_noiseceiling_flatmap.png
 """
 from dotenv import load_dotenv
 load_dotenv()
@@ -17,8 +18,42 @@ import os
 import argparse
 import pickle
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import hcp_utils as hcp
+from nilearn import plotting
 
 from src.utils.helpers import ComputeNoiseceiling
+
+
+def plot_flatmap(noiseceiling, title, out_path, vmax=100):
+    """Both-hemisphere flat map, matching noiseceiling_bmd.ipynb's style."""
+    cortex_data_left = hcp.left_cortex_data(noiseceiling)
+    cortex_data_right = hcp.right_cortex_data(noiseceiling)
+    datamax = max(np.nanmax(cortex_data_left), np.nanmax(cortex_data_right))
+
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(10, 4),
+                              subplot_kw={"projection": "3d"})
+    plt.subplots_adjust(wspace=0)
+    plotting.plot_surf(hcp.mesh.flat_left, cortex_data_left, threshold=1,
+                        bg_map=hcp.mesh.sulc_left, colorbar=False, cmap="hot",
+                        vmin=0, vmax=vmax, axes=axes[0])
+    plotting.plot_surf(hcp.mesh.flat_right, cortex_data_right, threshold=1,
+                        bg_map=hcp.mesh.sulc_right, colorbar=False, cmap="hot",
+                        vmin=0, vmax=vmax, axes=axes[1])
+    axes[0].invert_yaxis()
+    axes[1].invert_yaxis()
+
+    norm = plt.Normalize(vmin=0, vmax=vmax)
+    sm = plt.cm.ScalarMappable(cmap="hot", norm=norm)
+    sm.set_array([])
+    cbar = fig.colorbar(sm, ax=axes.ravel().tolist(), shrink=0.6)
+    cbar.set_ticks([0, round(datamax), vmax])
+    cbar.set_ticklabels([0, round(datamax), vmax])
+    fig.suptitle(title)
+    plt.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
 
 
 def main(args):
@@ -46,6 +81,10 @@ def main(args):
             out_path = os.path.join(
                 save_root, f"{subject}_BMD_phase-{task}_n-{n}_noiseceiling.npy")
             np.save(out_path, noiseceiling)
+            plot_flatmap(
+                noiseceiling, f"{subject} {args.version} task-{task} n={n}",
+                os.path.join(save_root,
+                             f"{subject}_BMD_phase-{task}_n-{n}_noiseceiling_flatmap.png"))
             summary = dict(
                 max=float(np.nanmax(noiseceiling)),
                 median=float(np.nanmedian(noiseceiling)),

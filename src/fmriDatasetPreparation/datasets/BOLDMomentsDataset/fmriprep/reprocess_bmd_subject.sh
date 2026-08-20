@@ -7,8 +7,16 @@ set -e
 # separate backgrounded stages by hand across conversation turns and relying
 # on each one being noticed before the next is kicked off.
 #
-# Never touches an existing derivatives version: everything writes under a
-# new derivatives/<version> tree.
+# Resumable: a multi-hour background job silently stopping partway through
+# (killed process, host reset, session boundary - whatever the cause) is a
+# real, observed failure mode for jobs this long, and re-running the whole
+# thing from scratch every time is wasteful and risky. Each stage checks for
+# its own completion marker first and skips itself if already done, so
+# re-running this script after an interruption resumes instead of restarting.
+#
+# Never touches versionC (or overwrites a completed run of a version):
+# everything writes under a new/resumable derivatives/<version> tree, and
+# versionC specifically is always refused outright.
 #
 # Usage:
 #   reprocess_bmd_subject.sh <subject_num_2digit e.g. 05> <new_version e.g. versionD> [extra fmriprep args...]
@@ -40,34 +48,43 @@ GLM_DIR="${PROJECT_ROOT}/src/fmriDatasetPreparation/datasets/BOLDMomentsDataset/
 VAL_DIR="${PROJECT_ROOT}/src/fmriDatasetPreparation/datasets/BOLDMomentsDataset/validation"
 VIZ_DIR="${PROJECT_ROOT}/src/fmriDatasetPreparation/visualizations"
 
-if [ -d "${ROOT}${OUTPUT_RELPATH}" ]; then
-    echo "REFUSING to run: ${ROOT}${OUTPUT_RELPATH} already exists. Pick an unused version name so nothing existing can be overwritten."
+if [ "${VERSION}" = "versionC" ]; then
+    echo "REFUSING to run: versionC is the dataset's primary derivatives version and must never be targeted by this script."
     exit 1
 fi
 
-echo "### [1/5] fMRIPrep: sub-${SUBJ} -> ${VERSION} (extra args: ${EXTRA_FMRIPREP_ARGS[*]})"
-mkdir -p "${WORK}"
-mkdir -p "${ROOT}${OUTPUT_RELPATH}/fmriprep"   # pre-create: letting docker auto-create this bind-mount source hits an NFS permission error on this filesystem
-docker run \
-    --user "$(id -u):$(id -g)" \
-    --rm \
-    -v "$ROOT/Nifti":/data:ro \
-    -v "${ROOT}${OUTPUT_RELPATH}/fmriprep":/out \
-    -v "$WORK":/work \
-    -v "$FREESURFER_HOME/license.txt":/opt/freesurfer_license/license.txt \
-    nipreps/fmriprep:${FMRIPREP_VERSION} \
-    /data /out \
-    --skip_bids_validation \
-    participant --participant-label "${SUBJ}" \
-    --output-space MNI152NLin2009cAsym:res-2 \
-    --fs-license-file /opt/freesurfer_license/license.txt \
-    --cifti-output 91k \
-    --slice-time-ref 0 \
-    --nthreads 8 \
-    --n-cpus 16 \
-    --stop-on-first-crash \
-    "${EXTRA_FMRIPREP_ARGS[@]}" \
-    -w /work
+FMRIPREP_DONE_MARKER="${ROOT}${OUTPUT_RELPATH}/fmriprep/sub-${SUBJ}.html"
+if [ -f "${FMRIPREP_DONE_MARKER}" ]; then
+    echo "### [1/5] fMRIPrep: sub-${SUBJ} -> ${VERSION} already completed (found ${FMRIPREP_DONE_MARKER}) - skipping"
+else
+    echo "### [1/5] fMRIPrep: sub-${SUBJ} -> ${VERSION} (extra args: ${EXTRA_FMRIPREP_ARGS[*]})"
+    mkdir -p "${WORK}"
+    mkdir -p "${ROOT}${OUTPUT_RELPATH}/fmriprep"   # pre-create: letting docker auto-create this bind-mount source hits an NFS permission error on this filesystem
+    docker run \
+        --user "$(id -u):$(id -g)" \
+        --rm \
+        -v "$ROOT/Nifti":/data:ro \
+        -v "${ROOT}${OUTPUT_RELPATH}/fmriprep":/out \
+        -v "$WORK":/work \
+        -v "$FREESURFER_HOME/license.txt":/opt/freesurfer_license/license.txt \
+        nipreps/fmriprep:${FMRIPREP_VERSION} \
+        /data /out \
+        --skip_bids_validation \
+        participant --participant-label "${SUBJ}" \
+        --output-space MNI152NLin2009cAsym:res-2 \
+        --fs-license-file /opt/freesurfer_license/license.txt \
+        --cifti-output 91k \
+        --slice-time-ref 0 \
+        --nthreads 8 \
+        --n-cpus 16 \
+        --stop-on-first-crash \
+        "${EXTRA_FMRIPREP_ARGS[@]}" \
+        -w /work
+    if [ ! -f "${FMRIPREP_DONE_MARKER}" ]; then
+        echo "fMRIPrep did not produce ${FMRIPREP_DONE_MARKER} - treating as failed, stopping."
+        exit 1
+    fi
+fi
 
 echo "### [2/5] QA gate: coregistration determinant check"
 PYTHONPATH="${PROJECT_ROOT}" "${MPY}/python3" "${QA_DIR}/coreg_determinant_check.py" \
@@ -80,6 +97,11 @@ PYTHONPATH="${PROJECT_ROOT}" "${MPY}/python3" "${QA_DIR}/coreg_determinant_check
 
 echo "### [3/5] GLMsingle: sub-${SUBJ}, sessions 2-5 -> ${VERSION}"
 for ses in 2 3 4 5; do
+    GLM_DONE_MARKER="${ROOT}${OUTPUT_RELPATH}/GLM/sub-${SUBJ}/ses-0${ses}/TYPED_FITHRF_GLMDENOISE_RR.npy"
+    if [ -f "${GLM_DONE_MARKER}" ]; then
+        echo "  -- session ${ses} already completed (found ${GLM_DONE_MARKER}) - skipping --"
+        continue
+    fi
     echo "  -- session ${ses} --"
     PYTHONPATH="${PROJECT_ROOT}" "${MPY}/python3" "${GLM_DIR}/glmsingle_bmd.py" \
         -s "${SUBJ}" -i "${ses}" --version "${VERSION}" -v
