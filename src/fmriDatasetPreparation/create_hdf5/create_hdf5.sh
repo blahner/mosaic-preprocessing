@@ -26,7 +26,7 @@ for dataset in "${!dataset_subjects[@]}"; do
         echo "Processing: ${subjectID_dataset}"
         
         # Create HDF5 file
-        python create_hdf5_pkl.py \
+        uv run --project "${PROJECT_ROOT}" python create_hdf5_pkl.py \
             --subjectID_dataset "${subjectID_dataset}" \
             --owner_name "Benjamin Lahner" \
             --owner_email "blahner@mit.edu"

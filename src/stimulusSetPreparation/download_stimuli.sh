@@ -6,9 +6,11 @@
 #   source .env && bash src/stimulusSetPreparation/download_stimuli.sh
 #
 # Prerequisites:
-#   - DATASETS_ROOT must be set (define it in your .env file)
+#   - DATASETS_ROOT and PROJECT_ROOT must be set (define them in your .env file)
 #   - AWS CLI installed and configured for unauthenticated S3 access
-#     (used for NOD, HAD, and NSD)
+#     (used for NOD, HAD, and NSD); `uv tool install awscli` works
+#   - uv installed, and `uv sync` already run in PROJECT_ROOT (the NSD step
+#     runs a small pandas snippet through `uv run`)
 #
 # What this script does:
 #   - Automatically downloads stimuli that are hosted on public S3 (NOD, HAD, NSD)
@@ -56,6 +58,13 @@ has_files() {
 check_env() {
     if [ -z "${DATASETS_ROOT}" ]; then
         echo -e "${RED}ERROR:${NC} DATASETS_ROOT is not set."
+        echo "  Source your .env file before running this script:"
+        echo "    source .env && bash src/stimulusSetPreparation/download_stimuli.sh"
+        exit 1
+    fi
+    # PROJECT_ROOT locates the uv project used for the NSD post-processing step
+    if [ -z "${PROJECT_ROOT}" ]; then
+        echo -e "${RED}ERROR:${NC} PROJECT_ROOT is not set."
         echo "  Source your .env file before running this script:"
         echo "    source .env && bash src/stimulusSetPreparation/download_stimuli.sh"
         exit 1
@@ -313,7 +322,7 @@ download_nsd() {
     # It lists the 1-indexed nsdIds of images never shown to any subject (all trial counts = 0).
     info "  [4/5] notshown.tsv (derived from nsd_stim_info_merged.csv)"
     if [ -f "$dest/nsd_stim_info_merged.csv" ]; then
-        python3 - <<'PYEOF'
+        NSD_DEST="$dest" uv run --project "${PROJECT_ROOT}" python - <<'PYEOF' 2>&1 | while IFS= read -r line; do info "    $line"; done
 import os, pandas as pd
 dest = os.environ.get("NSD_DEST")
 csv_path = os.path.join(dest, "nsd_stim_info_merged.csv")
@@ -322,18 +331,6 @@ df = pd.read_csv(csv_path)
 subj_cols = [c for c in df.columns if c.startswith("subject") and c[7:].isdigit()]
 not_shown = df.index[df[subj_cols].sum(axis=1) == 0].tolist()
 # nsdId in the CSV is 0-indexed; notshown.tsv uses 1-indexed nsdIds
-not_shown_1indexed = [i + 1 for i in not_shown]
-out_path = os.path.join(dest, "notshown.tsv")
-pd.DataFrame(not_shown_1indexed).to_csv(out_path, index=False, header=False)
-print(f"  Wrote {len(not_shown_1indexed)} not-shown image IDs to {out_path}")
-PYEOF
-        NSD_DEST="$dest" python3 - <<'PYEOF' 2>&1 | while IFS= read -r line; do info "    $line"; done
-import os, pandas as pd
-dest = os.environ.get("NSD_DEST")
-csv_path = os.path.join(dest, "nsd_stim_info_merged.csv")
-df = pd.read_csv(csv_path)
-subj_cols = [c for c in df.columns if c.startswith("subject") and c[7:].isdigit()]
-not_shown = df.index[df[subj_cols].sum(axis=1) == 0].tolist()
 not_shown_1indexed = [i + 1 for i in not_shown]
 out_path = os.path.join(dest, "notshown.tsv")
 pd.DataFrame(not_shown_1indexed).to_csv(out_path, index=False, header=False)
@@ -387,7 +384,7 @@ _nsd_manual_instructions() {
     info "  curl -L -o /tmp/coco_ann.zip http://images.cocodataset.org/annotations/annotations_trainval2017.zip"
     info "  unzip /tmp/coco_ann.zip -d $dest/annotations_trainval2017"
     info "  # notshown.tsv (derive from CSV after downloading it):"
-    info "  NSD_DEST=$dest python3 -c \""
+    info "  NSD_DEST=$dest uv run --project $PROJECT_ROOT python -c \""
     info "    import os, pandas as pd; dest=os.environ['NSD_DEST']"
     info "    df=pd.read_csv(os.path.join(dest,'nsd_stim_info_merged.csv'))"
     info "    cols=[c for c in df.columns if c.startswith('subject') and c[7:].isdigit()]"

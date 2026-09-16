@@ -39,7 +39,7 @@ for dataset in "${!dataset_subjects[@]}"; do
         #    --owner_email "blahner@mit.edu"
         
         # Upload to S3
-        python upload_hdf5.py \
+        uv run --project "${PROJECT_ROOT}" python upload_hdf5.py \
             --file_path "/data/vision/oliva/datasets/MOSAIC/hdf5_files/single_subject/${subjectID_dataset}.hdf5"
         
         # Clean up local file

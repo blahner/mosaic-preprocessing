@@ -45,18 +45,29 @@ The central MOSAIC folder will look like:
 
 If you want to preprocess your own dataset or re-implement the dataset preprocessing of the eight datasets above, continue to create your environment. Otherwise, skip to the "I want to use the originally published MOSAIC dataset" section.
 
+This project uses [uv](https://docs.astral.sh/uv/) to manage its Python environment. Install uv (see [other install options](https://docs.astral.sh/uv/getting-started/installation/)):
 ```
-conda create -n mosaic-preprocessing python=3.11
-conda activate mosaic-preprocessing
-cd /your/path/to/mosaic-preprocessing
-pip install -r requirements.txt
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Install [GLMsingle](https://github.com/cvnlab/GLMsingle)
+Then create the environment. `uv sync` reads `pyproject.toml`/`uv.lock`, downloads Python 3.11 if you don't already have it, and installs every dependency (including [GLMsingle](https://github.com/cvnlab/GLMsingle) at tag 1.2, the version used for the initial release of MOSAIC) into a project-local `.venv/`:
 ```
-pip install git+https://github.com/cvnlab/GLMsingle.git
-conda list glmsingle #check glmsingle version (1.2 for initial release of MOSAIC)
+cd /your/path/to/mosaic-preprocessing
+uv sync
 ```
+
+Because `uv.lock` is checked in, everyone who runs `uv sync` gets a byte-for-byte identical environment. Note that the original manuscript environment was installed from an unpinned requirements list, so the lock records a known-good resolution rather than an exact recreation of the versions the author happened to have; GLMsingle specifically is pinned to tag 1.2, the version used for the initial MOSAIC release. (GLMsingle's package metadata always reports `0.0.1` no matter which tag is installed, so the lock file is the authoritative record of what you actually have.)
+
+Run anything in that environment with `uv run`, which always resolves to this project's `.venv` regardless of what else is on your `PATH`:
+```
+uv run python -c "from glmsingle.glmsingle import GLM_single; print('GLMsingle OK')"
+grep -A2 'name = "glmsingle"' uv.lock  #shows the pinned tag and commit
+```
+You can also `source .venv/bin/activate` and call `python` directly, but the pipeline shell scripts in this repo use `uv run` so they don't depend on you having activated anything.
+
+Jupyter notebooks: in VS Code, select the `.venv` interpreter as the kernel; from a terminal, `uv run --with jupyterlab jupyter lab` (JupyterLab itself isn't a project dependency, only the `ipykernel` the notebooks need).
+
+To add or remove a dependency later, use `uv add <package>` / `uv remove <package>` rather than editing `pyproject.toml` by hand — both update `uv.lock` for you.
 
 Set up your .env file
 ```
@@ -90,7 +101,7 @@ a. Since it is common for stimulus sets to not be under a Creative Commons licen
 source .env && bash src/stimulusSetPreparation/download_stimuli.sh
 ```
 
-**Prerequisites:** AWS CLI installed (`pip install awscli` or via your package manager). Set `DATASETS_ROOT` in your `.env` file before running.
+**Prerequisites:** AWS CLI installed (`uv tool install awscli` or via your package manager). Set `DATASETS_ROOT` in your `.env` file before running.
 
 The script handles each dataset as follows:
 - **BOLD5000**: prints instructions → https://bold5000-dataset.github.io/website/download.html
@@ -108,8 +119,8 @@ OUTPUTS: stimulus set downloaded in each dataset-specific folder.
 
 b. Next, do some light preprocessing to extract the video frames from BMD and HAD, save nsd synthetic stimuli in own folders.
 ```
-python src/stimulusSetPreparation/video_frame_extraction/extract_frames_bmd.py
-python src/stimulusSetPreparation/video_frame_extraction/extract_frames_had.py
+uv run python src/stimulusSetPreparation/video_frame_extraction/extract_frames_bmd.py
+uv run python src/stimulusSetPreparation/video_frame_extraction/extract_frames_had.py
 src/stimulusSetPreparation/compile_datasets/save_nsdsynthetic_stimuli.ipynb
 ```
 
@@ -147,7 +158,7 @@ INPUTS: folder with stimuli in your MOSAIC dataset directory
 OUTPUTS: folder with dreamsim embeddings as .npy files for each stimulus
 
 ```
-python src/stimulusSetPreparation/extract_embeddings/dreamsim_embeddings.py
+uv run python src/stimulusSetPreparation/extract_embeddings/dreamsim_embeddings.py
 ```
 
 3. (Optional) Define dataset-specific train-test splits if not already done. If a dataset already defines a train-test split in its original publication, we highly recommend using preserving this split. If a dataset does not define a train-test split and one is not defined elsewhere, define your own in such a way that each subject has a non-overlapping train-test split. Sometimes this procedure requires additional code with file artifacts (see NOD below) and other times it does not (see HAD).
@@ -157,8 +168,8 @@ OUTPUTS: pickle file containing list of stimuli in test and train splits (but ca
 
 As an example, neither HAD nor NOD defined test train splits. HAD was simple enough to define based on the experimental runs because they regularly clycled through action categories per run. NOD was a bit trickier, and our method required these scripts that used dreamsim embeddings.
 ```
-python src/stimulusSetPreparation/extract_dataset_stiminfo/nod_testtrain_splits/make_imagenet_splits_rdm.py
-python src/stimulusSetPreparation/extract_dataset_stiminfo/nod_testtrain_splits/make_coco_splits_rdm.py
+uv run python src/stimulusSetPreparation/extract_dataset_stiminfo/nod_testtrain_splits/make_imagenet_splits_rdm.py
+uv run python src/stimulusSetPreparation/extract_dataset_stiminfo/nod_testtrain_splits/make_coco_splits_rdm.py
 ```
 
 4. Extract detailed stimulus information into a .tsv file. Required columns are
@@ -172,7 +183,7 @@ INPUTS: events files downloaded in BIDS format (e.g., what you would download fr
 OUTPUTS: .tsv file with stimulus information
 
 ```
-python src/stimulusSetPreparation/extract_dataset_stiminfo/extract_<DATASET>_stiminfo.py
+uv run python src/stimulusSetPreparation/extract_dataset_stiminfo/extract_<DATASET>_stiminfo.py
 ```
 
 MOSAIC emphasizes diligent data provenance. Especially as we train AI models on this data, we want to keep track of exactly which stimuli are used.
@@ -184,7 +195,7 @@ OUTPUTS: train.json, test.json, and artificial.json files for the aggregated dat
 
 ```
 src/stimulusSetPreparation/compile_datasets/compile_stiminfo_acrossdatasets.ipynb #this notebook creates a 'merged_stiminfo.tsv' file
-python src/stimulusSetPreparation/compile_datasets/make_testtrain_splits.py 
+uv run python src/stimulusSetPreparation/compile_datasets/make_testtrain_splits.py 
 src/stimulusSetPreparation/compile_datasets/testtrain_stats.ipynb #this notebook gives some stats about the composition of your test-train splits
 ```
 
@@ -217,7 +228,7 @@ INPUTS: fMRIPrep derivatives
 OUTPUTS: GLMsingle outputs of single trial beta estimates, pickle file of stimulus order corresponding to the beta estimates
 
 ```
-python src/fmriDatasetPreparation/datasets/<DATASET>/GLM/glmsingle_<DATASET>.py
+uv run python src/fmriDatasetPreparation/datasets/<DATASET>/GLM/glmsingle_<DATASET>.py
 ```
 
 4. Normalize single-trial beta estimates by dataset-specific train-test splits. This step uses the stimulus information .tsv file from "stimulus set preprocessing" step 3.
@@ -226,7 +237,7 @@ INPUTS: GLMsingle outputs of single trial beta estimates, .tsv file from "stimul
 OUTPUTS: train and test (and artificial) pickle files with normalized beta estimates. Each pickle file has tuple (betas, stimorder)
 
 ```
-python src/fmriDatasetPreparation/datasets/<DATASET>/GLM/organize_betas_<DATASET>.py
+uv run python src/fmriDatasetPreparation/datasets/<DATASET>/GLM/organize_betas_<DATASET>.py
 ```
 
 5. Compute noise ceiling estimates per voxel using the method detailed in the Natural Scenes Dataset [manuscript](https://www.nature.com/articles/s41593-021-00962-x). 
@@ -245,7 +256,7 @@ INPUTS: beta estimate pickle files from step 4, noise ceiling npy files from ste
 OUTPUTS: .hdf5 file
 
 ```
-python src/fmriDatasetPreparation/create_hdf5/create_hdf5_pkl.py --subjectID_dataset sub-XX_DATASET --owner_name "firstName lastName" --owner_email youremail@email.com
+uv run python src/fmriDatasetPreparation/create_hdf5/create_hdf5_pkl.py --subjectID_dataset sub-XX_DATASET --owner_name "firstName lastName" --owner_email youremail@email.com
 ```
 
 Note that the .hdf5 files include all single trial beta estimates. Subsequent stimulus set filtering when you aggregate subjects/datasets into your MOSAIC dataset will output train and test set .json files that will simply not reference the stimuli and fMRI trials that get filtered out. But the .hdf5 files themselves are agnostic to this stimulus set filtering.
@@ -278,12 +289,12 @@ Assuming the single subject hdf5 files are in /your/path/to/datasets/MOSAIC/hdf5
 
 For frequently accessing individual trials:
 ```
-python src/fmriDatasetPreparation/create_hdf5/merge_hdf5_ind.py --input_dir /your/path/to/datasets/MOSAIC/hdf5_files/single_subject ---output_dir /your/path/to/datasets/MOSAIC/hdf5_files/merged --output_file mosaic_ind.hdf5
+uv run python src/fmriDatasetPreparation/create_hdf5/merge_hdf5_ind.py --input_dir /your/path/to/datasets/MOSAIC/hdf5_files/single_subject ---output_dir /your/path/to/datasets/MOSAIC/hdf5_files/merged --output_file mosaic_ind.hdf5
 ```
 
 For frequently accessing chunks:
 ```
-python src/fmriDatasetPreparation/create_hdf5/merge_hdf5_chunks.py --input_dir /your/path/to/datasets/MOSAIC/hdf5_files/single_subject ---output_dir /your/path/to/datasets/MOSAIC/hdf5_files/merged --output_file mosaic_chunks.hdf5
+uv run python src/fmriDatasetPreparation/create_hdf5/merge_hdf5_chunks.py --input_dir /your/path/to/datasets/MOSAIC/hdf5_files/single_subject ---output_dir /your/path/to/datasets/MOSAIC/hdf5_files/merged --output_file mosaic_chunks.hdf5
 ```
 
 ## Why hdf5 files?

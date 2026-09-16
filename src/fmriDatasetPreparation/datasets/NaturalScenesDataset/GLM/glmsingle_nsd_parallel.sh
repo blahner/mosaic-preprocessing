@@ -14,7 +14,7 @@ num_cores=4
 
 # Define the function to run the Python script
 run_python_script() {
-    python3 ${ROOT}/glmsingle_nsd.py -s 5 -i "$1"
+    uv run --project "${PROJECT_ROOT}" python ${ROOT}/glmsingle_nsd.py -s 5 -i "$1"
 }
 
 # Export the function to make it available to parallel

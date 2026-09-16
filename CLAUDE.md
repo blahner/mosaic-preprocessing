@@ -8,13 +8,15 @@ Preprocessing pipeline for MOSAIC, an aggregated fMRI dataset spanning 8 source 
 
 ## Environment setup
 
+Dependencies are managed with [uv](https://docs.astral.sh/uv/) (`pyproject.toml` + checked-in `uv.lock`). There is no conda env, no `requirements.txt`, and no `pip install` step.
+
 ```bash
-conda create -n mosaic-preprocessing python=3.11
-conda activate mosaic-preprocessing
-pip install -r requirements.txt
-pip install git+https://github.com/cvnlab/GLMsingle.git   # not in requirements.txt
-cp .env.example .env   # then fill in and `source .env`
+curl -LsSf https://astral.sh/uv/install.sh | sh   # if uv isn't installed
+uv sync                                            # creates ./.venv with Python 3.11 + all deps
+cp .env.example .env                               # then fill in and `source .env`
 ```
+
+`uv sync` also installs GLMsingle, which isn't on PyPI — it's declared in `[tool.uv.sources]` as a git dependency pinned to tag 1.2 (the version used for the initial MOSAIC release). Change dependencies with `uv add`/`uv remove` so `uv.lock` stays in sync; never hand-edit the lock.
 
 Required env vars (`.env`, loaded via `python-dotenv` in `src/utils/*.py`):
 - `PROJECT_ROOT` — path to this repo
@@ -25,7 +27,13 @@ Required env vars (`.env`, loaded via `python-dotenv` in `src/utils/*.py`):
 
 fMRIPrep runs via Docker — see `fmriDatasetPreparation/datasets/<DATASET>/fmriprep/run_fmriprep_single.sh`. `FREESURFER_HOME` must be set (either in `.env` or shell rc). No test suite exists in this repo.
 
-All non-Docker pipeline scripts (GLMsingle, organize_betas, noise ceiling, QA scripts) must run in the `mosaic-preprocessing` conda env — it's the only env with `GLMsingle`/`hcp_utils`/`nilearn` installed alongside the `requirements.txt`-pinned `numpy==1.26.4`. On at least this machine, bare `python3` and even `conda run -n mosaic-preprocessing python3` silently resolve to a *different* conda env because another env's `bin/` is prepended to `$PATH` ahead of the base conda install (not from this repo's `.bashrc` block — some other shell init). Don't trust `conda activate`/`conda run` here without verifying `python3 -c "import sys; print(sys.prefix)"` actually prints `.../envs/mosaic-preprocessing`; when in doubt, invoke the env's binary by its full path, e.g. `/data/vision/oliva/blahner/anaconda3/envs/mosaic-preprocessing/bin/python3`.
+All non-Docker pipeline scripts (GLMsingle, organize_betas, noise ceiling, QA scripts) must run in this project's `.venv` — it's the only environment with `GLMsingle`/`hcp_utils`/`nilearn` installed alongside the pinned `numpy==1.26.4`. Never invoke a bare `python3`: it resolves to whatever interpreter happens to be first on `$PATH` (a system Python, or an unrelated env), which will not have these packages. Run everything as:
+
+```bash
+uv run --project "${PROJECT_ROOT}" python <script.py> [args]
+```
+
+`uv run` ignores `$PATH` and resolves to `$PROJECT_ROOT/.venv` — that's why the pipeline shell scripts all use this form, and why no absolute interpreter path is hardcoded anywhere. `--project` is what makes it work from any cwd; drop it when you're already inside the repo. Sanity check: `uv run python -c "import sys; print(sys.prefix)"` should print `<repo>/.venv`. Scripts import `src.utils...`, so `PYTHONPATH` must still include `PROJECT_ROOT` (the project itself is not installed into the venv — `[tool.uv] package = false`).
 
 ## Architecture
 

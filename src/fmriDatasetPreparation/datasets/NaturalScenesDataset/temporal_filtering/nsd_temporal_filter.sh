@@ -3,9 +3,9 @@ set -e
 ROOT=${PROJECT_ROOT}/src/fmriDatasetPreparation/datasets/NaturalScenesDataset/temporal_filtering
 for subj in {01..08}; do
     echo "Running temporal filtering for sub-${subj}"
-    python3 ${ROOT}/nsd_temporal_filter.py -s ${subj} -t 'nsdcore' -v
-    python3 ${ROOT}/nsd_temporal_filter.py -s ${subj} -t 'rest' -v
-    python3 ${ROOT}/nsd_temporal_filter.py -s ${subj} -t 'nsdsynthetic' -v
+    uv run --project "${PROJECT_ROOT}" python ${ROOT}/nsd_temporal_filter.py -s ${subj} -t 'nsdcore' -v
+    uv run --project "${PROJECT_ROOT}" python ${ROOT}/nsd_temporal_filter.py -s ${subj} -t 'rest' -v
+    uv run --project "${PROJECT_ROOT}" python ${ROOT}/nsd_temporal_filter.py -s ${subj} -t 'nsdsynthetic' -v
     echo "Finished subject ${subj}"
 done
 echo "Finished temporal filtering for all subjects in the loop"

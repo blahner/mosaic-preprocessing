@@ -1,0 +1,38 @@
+[project]
+name = "mosaic-preprocessing"
+version = "0.1.0"
+description = "Preprocessing pipeline for MOSAIC, an aggregated fMRI dataset spanning 8 source fMRI datasets."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "boto3",
+    "botocore",
+    "glmsingle",
+    "h5py",
+    "hcp_utils",
+    "humanize",
+    "ipykernel",
+    "matplotlib",
+    "nilearn",
+    "numpy==1.26.4",
+    "opencv-python",
+    "pandas",
+    "pycocotools",
+    "python-dotenv",
+    "scipy",
+    "torch",
+    "torchvision",
+    "tqdm",
+]
+
+[tool.uv]
+# This repo is a collection of pipeline scripts, not an installable package:
+# scripts import `src.utils...` with PROJECT_ROOT on PYTHONPATH (see .env), so
+# there is nothing to build or install for the project itself.
+package = false
+
+[tool.uv.sources]
+# GLMsingle is not on PyPI. Tag 1.2 is the version used for the initial
+# release of MOSAIC.
+glmsingle = { git = "https://github.com/cvnlab/GLMsingle.git", tag = "1.2" }

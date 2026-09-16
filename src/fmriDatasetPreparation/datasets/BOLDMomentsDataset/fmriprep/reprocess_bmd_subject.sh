@@ -25,9 +25,9 @@ set -e
 #   reprocess_bmd_subject.sh 05 versionD --bold2t1w-dof 6
 #
 # Requires: DATASETS_ROOT, PROJECT_ROOT, FREESURFER_HOME set (source .env first).
-# Requires: docker; the mosaic-preprocessing conda env for everything after
-# fmriprep (see CLAUDE.md "Environment setup" for why this can't just be
-# `conda run`/bare `python3`).
+# Requires: docker; uv, with `uv sync` already run in PROJECT_ROOT (everything
+# after fmriprep runs through `uv run --project "${PROJECT_ROOT}"`, which always
+# resolves to this project's .venv no matter what is on $PATH).
 
 if [ -z "$1" ] || [ -z "$2" ]; then
     echo "Usage: $0 <subject_num_2digit> <new_version> [extra fmriprep args...]"
@@ -38,7 +38,7 @@ VERSION=$2
 shift 2
 EXTRA_FMRIPREP_ARGS=("$@")
 
-MPY=/data/vision/oliva/blahner/anaconda3/envs/mosaic-preprocessing/bin
+MPY=(uv run --project "${PROJECT_ROOT}" python)
 export ROOT="${DATASETS_ROOT}/BOLDMomentsDataset"
 export OUTPUT_RELPATH="/derivatives/${VERSION}"
 export WORK="/tmp/mosaic-fmriprep-work/BMD-sub${SUBJ}-${VERSION}"
@@ -87,7 +87,7 @@ else
 fi
 
 echo "### [2/5] QA gate: coregistration determinant check"
-PYTHONPATH="${PROJECT_ROOT}" "${MPY}/python3" "${QA_DIR}/coreg_determinant_check.py" \
+PYTHONPATH="${PROJECT_ROOT}" "${MPY[@]}" "${QA_DIR}/coreg_determinant_check.py" \
     --fmriprep-dir "${ROOT}${OUTPUT_RELPATH}/fmriprep" \
     --subs "sub-${SUBJ}" \
     --out-csv "${ROOT}${OUTPUT_RELPATH}/coreg_determinant_report_sub-${SUBJ}.csv"
@@ -103,18 +103,18 @@ for ses in 2 3 4 5; do
         continue
     fi
     echo "  -- session ${ses} --"
-    PYTHONPATH="${PROJECT_ROOT}" "${MPY}/python3" "${GLM_DIR}/glmsingle_bmd.py" \
+    PYTHONPATH="${PROJECT_ROOT}" "${MPY[@]}" "${GLM_DIR}/glmsingle_bmd.py" \
         -s "${SUBJ}" -i "${ses}" --version "${VERSION}" -v
 done
 
 echo "### [4/5] organize_betas + noise ceiling: sub-${SUBJ} -> ${VERSION}"
-PYTHONPATH="${PROJECT_ROOT}" "${MPY}/python3" "${GLM_DIR}/organize_betas.py" \
+PYTHONPATH="${PROJECT_ROOT}" "${MPY[@]}" "${GLM_DIR}/organize_betas.py" \
     -s "${SUBJ}" --version "${VERSION}" -v
-PYTHONPATH="${PROJECT_ROOT}" "${MPY}/python3" "${VAL_DIR}/noiseceiling_compare.py" \
+PYTHONPATH="${PROJECT_ROOT}" "${MPY[@]}" "${VAL_DIR}/noiseceiling_compare.py" \
     -s "${SUBJ}" --version "${VERSION}"
 
 echo "### [5/5] QC movie: sub-${SUBJ} -> ${VERSION}"
-PYTHONPATH="${PROJECT_ROOT}" "${MPY}/python3" "${VIZ_DIR}/bmd_fmriprep_qc_movie.py" \
+PYTHONPATH="${PROJECT_ROOT}" "${MPY[@]}" "${VIZ_DIR}/bmd_fmriprep_qc_movie.py" \
     --subs "sub-${SUBJ}" --version "${VERSION}"
 
 echo "### DONE: sub-${SUBJ} fully reprocessed under derivatives/${VERSION}"
