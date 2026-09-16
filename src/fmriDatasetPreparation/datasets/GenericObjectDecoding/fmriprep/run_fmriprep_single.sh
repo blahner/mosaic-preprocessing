@@ -3,7 +3,7 @@ set -e
 export ROOT="${DATASETS_ROOT}/GenericObjectDecoding"
 export OUTPUT_RELPATH=/derivatives
 export WORK=${TMP}/tmp/GOD-workdir
-export FMRIPREP_VERSION="23.2.0"
+export FMRIPREP_VERSION="25.2.5"
 echo "${DATASETS_ROOT}" 
 mkdir -p ${WORK}
 mkdir -p "${ROOT}/${OUTPUT_RELPATH}"
@@ -26,10 +26,10 @@ for subj in {01..05}; do
     /data /out \
     --skip_bids_validation \
     participant --participant-label ${subj} \
-    --output-space MNI152NLin2009cAsym:res-2 \
+    --output-space MNI152NLin2009cAsym:res-2 fsaverage7 anat fsnative \
     --fs-license-file /opt/freesurfer_license/license.txt \
     --cifti-output 91k \
-    --bold2t1w-dof 12 \
+    --bold2t1w-dof 6 \
     --slice-time-ref 0 \
     --nthreads $nthreads \
     --n-cpus $ncpus \
