@@ -21,6 +21,7 @@ dependencies = [
     "pycocotools",
     "python-dotenv",
     "scipy",
+    "simpleitk>=2.5.6",
     "torch",
     "torchvision",
     "tqdm",

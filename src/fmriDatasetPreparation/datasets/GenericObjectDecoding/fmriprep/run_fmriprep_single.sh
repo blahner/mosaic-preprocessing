@@ -37,6 +37,7 @@ for subj in {01..05}; do
     --fs-license-file /opt/freesurfer_license/license.txt \
     --cifti-output 91k \
     --bold2anat-dof 6 \
+    --no-track-sessions \
     --slice-time-ref 0 \
     --nthreads $nthreads \
     --omp-nthreads $omp_nthreads \

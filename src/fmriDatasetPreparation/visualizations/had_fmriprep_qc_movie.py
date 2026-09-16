@@ -342,7 +342,7 @@ def make_run_summary_fig(sub, sessions, tasks):
                 ses_ids.append(sessions.index(ses))
 
     x = np.arange(len(run_labels))
-    cmap = plt.cm.get_cmap("tab20", len(sessions))
+    cmap = matplotlib.colormaps["tab20"].resampled(len(sessions))
     colors = [cmap(s) for s in ses_ids]
 
     fig, axes = plt.subplots(2, 1, figsize=FIG_SIZE, sharex=True)
