@@ -3,9 +3,12 @@ Dataset-agnostic sanity check on fMRIPrep's per-run BOLD->T1w coregistration.
 
 Background
 ----------
-Every dataset's fmriprep run script in this repo passes --bold2t1w-dof 12
-(full affine: independent scale + shear per axis), rather than fMRIPrep's own
-documented default of 6 (rigid body: rotation + translation only). Because a
+The original MOSAIC derivatives were made with fMRIPrep 23.2.0 and
+--bold2t1w-dof 12 (full affine: independent scale + shear per axis), rather
+than fMRIPrep's own documented default of 6 (rigid body: rotation +
+translation only). The fmriprep run scripts in this repo now use fMRIPrep
+25.2.5 with --bold2anat-dof 6; this check remains useful for auditing the
+older dof=12 derivatives, and as a sanity check on any new run. Because a
 subject's head does not actually change size or shear between a functional
 run and its own same-session anatomical, any scale != 1 in that transform is
 a registration artifact, not anatomy. Under dof=12 the coregistration search

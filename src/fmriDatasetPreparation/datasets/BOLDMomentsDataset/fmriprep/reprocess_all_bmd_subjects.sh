@@ -8,7 +8,7 @@
 # conversation to reconstruct what's running and why.
 #
 # Origin: BMD sub-05's QC movie showed a brain-scaling artifact, traced to
-# --bold2t1w-dof 12 (full affine BOLD->T1w registration, used project-wide)
+# --bold2t1w-dof 12 (full affine BOLD->T1w registration, used project-wide at the time)
 # occasionally letting an individual run's coregistration converge to a
 # spurious scale instead of pure rigid motion. Scanning all 10 BMD subjects'
 # EXISTING versionC fmriprep output with coreg_determinant_check.py found

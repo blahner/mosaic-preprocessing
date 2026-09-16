@@ -8,8 +8,10 @@ to any dataset here, current or future.
 
 ## 1. `coreg_determinant_check.py` — find suspect runs automatically
 
-All 9 datasets' fmriprep scripts pass `--bold2t1w-dof 12` (full affine BOLD→T1w
-registration) instead of fMRIPrep's own default of 6 (rigid body). Since a
+All 9 datasets' fmriprep scripts now run fMRIPrep 25.2.5 with `--bold2anat-dof 6`
+(rigid body, fMRIPrep's default). The original MOSAIC derivatives were made with
+fMRIPrep 23.2.0 and `--bold2t1w-dof 12` (full affine BOLD→T1w registration)
+instead, and that setting is what this check was built to audit. Since a
 subject's brain cannot actually change size or shear between a functional run
 and its own anatomical, any non-unit scale in that per-run coregistration
 transform is a registration artifact. Under dof=12 this occasionally happens

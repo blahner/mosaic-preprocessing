@@ -3,14 +3,21 @@ set -e
 export ROOT="${DATASETS_ROOT}/NaturalScenesDataset"
 export OUTPUT_RELPATH=/derivatives
 export WORK=${TMP}/tmp/NSD-workdir
-export FMRIPREP_VERSION="23.2.0"
+export FMRIPREP_VERSION="25.2.5"
 echo "${DATASETS_ROOT}" 
 mkdir -p ${WORK}
-mkdir -p "${ROOT}/${OUTPUT_RELPATH}"
+# create the /out bind-mount source ourselves: if docker auto-creates a missing
+# bind-mount path it lands root-owned, and the --user container then cannot
+# write into it (fmriprep fails with PermissionError on '/out/logs')
+mkdir -p "${ROOT}/${OUTPUT_RELPATH}/fmriprep"
 
-nthreads=8
-ncpus=16
+# total threads = at most half of this shared machine's 64 cores; one subject at a time
+nthreads=32
+omp_nthreads=8
 docker pull nipreps/fmriprep:${FMRIPREP_VERSION}
+# fMRIPrep names its work tree fmriprep_<major>_<minor>_wf/, derived here from
+# FMRIPREP_VERSION so the cleanup below can't go stale when the version changes
+WF_ROOT="${WORK}/fmriprep_$(echo "${FMRIPREP_VERSION}" | cut -d. -f1,2 | tr . _)_wf"
 
 echo "Starting fMRIPrep for sub-$1"
 docker run \
@@ -25,16 +32,24 @@ docker run \
     /data /out \
     --skip_bids_validation \
     participant --participant-label $1 \
-    --output-space MNI152NLin2009cAsym:res-2 \
+    --output-space MNI152NLin2009cAsym:res-2 fsaverage anat fsnative \
     --fs-license-file /opt/freesurfer_license/license.txt \
     --cifti-output 91k \
-    --bold2t1w-dof 12 \
+    --bold2anat-dof 6 \
     --slice-time-ref 0 \
     --nthreads $nthreads \
-    --n-cpus $ncpus \
+    --omp-nthreads $omp_nthreads \
     --stop-on-first-crash \
     -w /work
 echo "Deleting the large tmp files from subject $1"
-rm -r $WORK/fmriprep_23_2_wf/sub_$1_wf/
+# subject dir is sub_<id>_wf, or sub_<id>_ses_<ses>_wf when processed session-wise
+shopt -s nullglob
+subj_wf_dirs=("${WF_ROOT}"/sub_${1}_*wf)
+shopt -u nullglob
+if [ ${#subj_wf_dirs[@]} -eq 0 ]; then
+    echo "WARNING: no work dir matching ${WF_ROOT}/sub_${1}_*wf - nothing deleted"
+else
+    rm -r "${subj_wf_dirs[@]}"
+fi
 
 echo "Finished fMRIPrep for the subject"
