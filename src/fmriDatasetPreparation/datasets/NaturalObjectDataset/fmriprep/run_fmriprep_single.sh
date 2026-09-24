@@ -18,10 +18,18 @@ docker pull nipreps/fmriprep:${FMRIPREP_VERSION}
 # FMRIPREP_VERSION so the cleanup below can't go stale when the version changes
 WF_ROOT="${WORK}/fmriprep_$(echo "${FMRIPREP_VERSION}" | cut -d. -f1,2 | tr . _)_wf"
 
-for subj in {1..30}; do
+for subj in {01..30}; do
+    # Resumable: fMRIPrep writes sub-XX_anat.html only on a successful run, so its
+    # presence means this subject is done. Lets the loop be re-run after an
+    # interruption (e.g. a host reboot) without redoing finished subjects.
+    if [ -f "${ROOT}/${OUTPUT_RELPATH}/fmriprep/sub-${subj}_anat.html" ]; then
+        echo "Skipping sub-${subj}: already has fmriprep output"
+        continue
+    fi
     echo "Starting fMRIPrep for sub-${subj}"
     docker run \
     --user $(id -u):$(id -g) \
+    --group-add $(stat -c '%g' "${ROOT}/Nifti") \
     -it --rm \
     -v $ROOT/Nifti:/data:ro \
     -v "${ROOT}/${OUTPUT_RELPATH}/fmriprep":/out \
