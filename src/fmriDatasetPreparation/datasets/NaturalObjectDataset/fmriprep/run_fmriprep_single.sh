@@ -22,7 +22,11 @@ for subj in {01..30}; do
     # Resumable: fMRIPrep writes sub-XX_anat.html only on a successful run, so its
     # presence means this subject is done. Lets the loop be re-run after an
     # interruption (e.g. a host reboot) without redoing finished subjects.
-    if [ -f "${ROOT}/${OUTPUT_RELPATH}/fmriprep/sub-${subj}_anat.html" ]; then
+    # Subjects with several functional sessions get sub-XX_anat.html plus per-session
+    # _func.html; single-session subjects (NOD sub-10..30) get one combined sub-XX.html
+    # instead - accept either as the done-marker.
+    if [ -f "${ROOT}/${OUTPUT_RELPATH}/fmriprep/sub-${subj}_anat.html" ] \
+       || [ -f "${ROOT}/${OUTPUT_RELPATH}/fmriprep/sub-${subj}.html" ]; then
         echo "Skipping sub-${subj}: already has fmriprep output"
         continue
     fi
