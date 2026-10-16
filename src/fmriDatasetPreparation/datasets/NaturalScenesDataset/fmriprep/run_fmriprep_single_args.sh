@@ -11,9 +11,13 @@ mkdir -p ${WORK}
 # write into it (fmriprep fails with PermissionError on '/out/logs')
 mkdir -p "${ROOT}/${OUTPUT_RELPATH}/fmriprep"
 
-# total threads = at most half of this shared machine's 64 cores; one subject at a time
-nthreads=32
-omp_nthreads=8
+# NSD is by far the largest dataset here (400-536 runs/subject vs 10-145
+# elsewhere), and sub-07 showed the box sitting mostly idle at 32/8 - load
+# averaged well under 10 for most of its 97h. Raised to 48/12 to give each
+# subject more of this 64-core machine while still leaving headroom for other
+# users. Disk, not CPU, is the limit on running subjects concurrently.
+nthreads=48
+omp_nthreads=12
 docker pull nipreps/fmriprep:${FMRIPREP_VERSION}
 # fMRIPrep names its work tree fmriprep_<major>_<minor>_wf/, derived here from
 # FMRIPREP_VERSION so the cleanup below can't go stale when the version changes
