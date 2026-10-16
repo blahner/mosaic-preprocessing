@@ -20,6 +20,19 @@ docker pull nipreps/fmriprep:${FMRIPREP_VERSION}
 WF_ROOT="${WORK}/fmriprep_$(echo "${FMRIPREP_VERSION}" | cut -d. -f1,2 | tr . _)_wf"
 
 for subj in {1..4}; do
+    # Resumable: fMRIPrep writes its subject report only on a successful run, so its
+    # presence means this subject is done. Lets the loop be re-run after an
+    # interruption (e.g. a host reboot) without redoing finished subjects.
+    # Multi-session subjects get sub-X_anat.html plus per-session _func.html;
+    # single-session subjects get one combined sub-X.html - accept either.
+    if [ -f "${ROOT}/${OUTPUT_RELPATH}/fmriprep/sub-CSI${subj}_anat.html" ] \
+       || [ -f "${ROOT}/${OUTPUT_RELPATH}/fmriprep/sub-CSI${subj}.html" ]; then
+        echo "Skipping sub-CSI${subj}: already has fmriprep output"
+        continue
+    fi
+    # a crashed run leaves FreeSurfer IsRunning locks that block recon-all on resume
+    find "${ROOT}/${OUTPUT_RELPATH}/fmriprep/sourcedata/freesurfer/sub-CSI${subj}/scripts" \
+        -name 'IsRunning*' -delete 2>/dev/null || true
     echo "Starting fMRIPrep for sub-CSI${subj}"
     docker run \
     --user $(id -u):$(id -g) \
