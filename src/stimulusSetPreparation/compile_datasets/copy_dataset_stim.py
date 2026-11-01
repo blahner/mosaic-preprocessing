@@ -168,11 +168,6 @@ def main(args):
                 os.makedirs(destination)
             allframe_filepaths = sorted(glob.glob(os.path.join(source, "*.jpg")))
             for source_file in allframe_filepaths:
-                filename = source_file.split('/')[-1]
-                destination_file = os.path.join(destination, f"{mit_name}_{filename}")
-                shutil.copy(source_file, destination_file)      
-
-            for source_file in allframe_filepaths:
                 filename = Path(source_file).name
                 filename_alias = filename.split('_')[0] #the XXXX video number
                 mit_filename = filename.replace(filename_alias, Path(annotations[f"{filename_alias:04}"]['MiT_filename'].split('/')[-1]).stem)

@@ -101,14 +101,19 @@ a. Since it is common for stimulus sets to not be under a Creative Commons licen
 source .env && bash src/stimulusSetPreparation/download_stimuli.sh
 ```
 
-**Prerequisites:** AWS CLI installed (`uv tool install awscli` or via your package manager). Set `DATASETS_ROOT` in your `.env` file before running.
+**Prerequisites:** Set `DATASETS_ROOT` and `PROJECT_ROOT` in your `.env` file before running. Install the AWS CLI, which the script uses to download NOD and NSD from public S3 buckets (no AWS account needed). Without it, those two datasets are skipped and listed as manual downloads:
+```
+uv tool install awscli   #installs `aws` into ~/.local/bin, isolated from the project environment
+aws --version            #check it is on your PATH
+```
 
 The script handles each dataset as follows:
-- **BOLD5000**: prints instructions → https://bold5000-dataset.github.io/website/download.html
-- **BOLD Moments Dataset (BMD)**: prints instructions → https://github.com/blahner/BOLDMomentsDataset
-- **Generic Object Decoding (GOD) + Deeprecon** (shared stimulus set): prints instructions → https://github.com/KamitaniLab/GenericObjectDecoding and https://github.com/KamitaniLab/DeepImageReconstruction
-- **Human Actions Dataset (HAD)**: auto-downloads via `aws s3 sync` from OpenNeuro
-- **THINGS**: prints instructions → https://osf.io/jum2f/ (see also `src/fmriDatasetPreparation/datasets/THINGS_fmri/download/`)
+- **BOLD5000**: auto-downloads `BOLD5000_Stimuli.zip` (~1.2 GB) via `curl` from the Dropbox link on https://bold5000-dataset.github.io/website/download.html
+- **BOLD Moments Dataset (BMD)**: auto-downloads `annotations.json` from OpenNeuro and the password-protected `stimulus_set.zip` (~3 GB, includes the videos and pre-extracted frames) from https://boldmomentsdataset.csail.mit.edu/stimuli_metadata/, then prints instructions to read the terms of use in `stimuli_access.txt` (which ends with the password) and unzip it
+- **Generic Object Decoding (GOD) + Deeprecon** (shared set of 1250 natural ImageNet images, stored once under `GenericObjectDecoding/`): prints instructions for the Kamitani Lab request form (https://forms.gle/ujvA34948Xg49jdn9, linked from https://github.com/KamitaniLab/GenericObjectDecoding). The reply email is immediate and contains a Google Drive link and zip password; download with `uv tool run gdown <FILE_ID>` (the ID from the Drive link) and unzip.
+- **Deeprecon artificial shapes + letters**: auto-downloads the 50 images and all four stimulus-ID maps from the [Deep Image Reconstruction figshare](https://figshare.com/articles/dataset/Deep_Image_Reconstruction/7033577) via `curl`
+- **Human Actions Dataset (HAD)**: auto-downloads the 21600 stimulus videos (~2.2 GB) from OpenNeuro, pinned to the ds004488 v1.1.1 snapshot used for MOSAIC. Each file is fetched by the S3 version ID listed in `src/fmriDatasetPreparation/datasets/HumanActionsDataset/download/had_stimuli_v1.1.1_manifest.tsv` and verified against its md5
+- **THINGS**: auto-downloads the password-protected `images_THINGS.zip` (~5 GB, all 26,107 THINGS images) from https://osf.io/jum2f/, then prints instructions to read the license terms in `password_images.txt` (which ends with the password) and unzip it. Re-running the script then copies the 8740 images shown in THINGS-fMRI (listed in `src/fmriDatasetPreparation/datasets/THINGS_fmri/download/THINGS_fmri_filenames.txt`) into `experimental_images/`
 - **Natural Object Dataset (NOD)**: auto-downloads via `aws s3 sync` from OpenNeuro
 - **Natural Scenes Dataset (NSD)**: auto-downloads via `aws s3 cp` from the NSD S3 bucket (~39 GB for the stimuli HDF5)
 
@@ -117,9 +122,8 @@ The script skips any dataset whose stimuli are already present, so it is safe to
 INPUTS: None  
 OUTPUTS: stimulus set downloaded in each dataset-specific folder.
 
-b. Next, do some light preprocessing to extract the video frames from BMD and HAD, save nsd synthetic stimuli in own folders.
+b. Next, do some light preprocessing to extract the video frames from HAD, save nsd synthetic stimuli in own folders. BMD needs no frame extraction: its `stimulus_set.zip` already includes every video's frames (`frames/`) and middle frames (`frames_middle/`) in the naming format step c expects.
 ```
-uv run python src/stimulusSetPreparation/video_frame_extraction/extract_frames_bmd.py
 uv run python src/stimulusSetPreparation/video_frame_extraction/extract_frames_had.py
 src/stimulusSetPreparation/compile_datasets/save_nsdsynthetic_stimuli.ipynb
 ```

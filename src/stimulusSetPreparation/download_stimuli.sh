@@ -8,15 +8,17 @@
 # Prerequisites:
 #   - DATASETS_ROOT and PROJECT_ROOT must be set (define them in your .env file)
 #   - AWS CLI installed and configured for unauthenticated S3 access
-#     (used for NOD, HAD, and NSD); `uv tool install awscli` works
+#     (used for NOD and NSD); `uv tool install awscli` works
 #   - uv installed, and `uv sync` already run in PROJECT_ROOT (the NSD step
 #     runs a small pandas snippet through `uv run`)
 #
 # What this script does:
-#   - Automatically downloads stimuli that are hosted on public S3 (NOD, HAD, NSD)
+#   - Automatically downloads stimuli that are hosted on public S3 (NOD, NSD) and the pinned HAD v1.1.1 videos
+#     plus BOLD5000 (Dropbox) and the Deeprecon artificial/letter images +
+#     stimulus maps (figshare)
 #   - Prints step-by-step manual instructions for datasets that require
-#     account registration, browser downloads, or custom tooling (BOLD5000,
-#     BMD, GOD/Deeprecon, THINGS)
+#     account registration, request forms, browser downloads, or custom tooling
+#     (BMD, GOD/Deeprecon natural images, THINGS)
 #   - Skips any dataset whose stimuli are already present
 #
 # After this script completes, follow the README step 3b to extract video
@@ -70,102 +72,199 @@ check_env() {
         exit 1
     fi
     if ! command -v aws &>/dev/null; then
-        warn "AWS CLI not found. Datasets that require S3 (NOD, HAD, NSD) will be skipped."
+        warn "AWS CLI not found. Datasets that require S3 (NOD, NSD) will be skipped."
         NO_AWS=1
     fi
 }
 
 # ── BOLD5000 ──────────────────────────────────────────────────────────────────
 #
+# Downloaded from the Dropbox link on https://bold5000-dataset.github.io/website/download.html
+# (BOLD5000_Stimuli.zip, ~1.2 GB). The zip's top-level BOLD5000_Stimuli/ folder is
+# stripped so its contents land directly in stimuli_metadata/.
 # Expected layout after download:
-#   $DATASETS_ROOT/BOLD5000/derivatives/stimuli_metadata/Scene_Stimuli/
-#     Presented_Stimuli/COCO/*.jpg       (~2000 images)
-#     Presented_Stimuli/ImageNet/*.JPEG  (~1916 images)
-#     Presented_Stimuli/Scene/*.jpg      (~1000 images)
+#   $DATASETS_ROOT/BOLD5000/derivatives/stimuli_metadata/
+#     Scene_Stimuli/repeated_stimuli_113_list.txt   (test-set list, used by extract_b5000_stiminfo.py)
+#     Scene_Stimuli/Presented_Stimuli/COCO/*.jpg       (2000 images)
+#     Scene_Stimuli/Presented_Stimuli/ImageNet/*.JPEG  (1916 images)
+#     Scene_Stimuli/Presented_Stimuli/Scene/*.jpg      (1000 images)
+#     Scene_Stimuli/Original_Images/, Image_Labels/, Stimuli_Presentation_Lists/, Localizer_Stimuli/
+
+BOLD5000_STIMULI_URL="https://www.dropbox.com/s/5ie18t4rjjvsl47/BOLD5000_Stimuli.zip?dl=1"
 
 download_bold5000() {
     section "BOLD5000"
-    local dest="$DATASETS_ROOT/BOLD5000/derivatives/stimuli_metadata/Scene_Stimuli/Presented_Stimuli"
-    if has_files "$dest" 100; then
+    local root="$DATASETS_ROOT/BOLD5000/derivatives/stimuli_metadata"
+    local dest="$root/Scene_Stimuli/Presented_Stimuli"
+    if has_files "$dest" 4916 && [ -f "$root/Scene_Stimuli/repeated_stimuli_113_list.txt" ]; then
         ok "BOLD5000 stimuli already present — skipping."
         SKIPPED_DOWNLOADS+=("BOLD5000")
         return
     fi
-    warn "BOLD5000 stimuli require manual download."
-    info "1. Go to: https://bold5000-dataset.github.io/website/download.html"
-    info "2. Download 'Scene_Stimuli.zip' from the Stimuli section."
-    info "3. Extract it so the following path exists:"
-    info "     $dest/COCO/*.jpg"
-    info "     $dest/ImageNet/*.JPEG"
-    info "     $dest/Scene/*.jpg"
-    MANUAL_DOWNLOADS+=("BOLD5000")
+    info "Downloading BOLD5000 stimuli from Dropbox (~1.2 GB)..."
+    mkdir -p "$root"
+    local zip="$root/BOLD5000_Stimuli.zip"
+    if curl -fL --progress-bar -o "$zip" "$BOLD5000_STIMULI_URL" \
+        && unzip -q -o "$zip" -d "$root" \
+        && cp -a "$root/BOLD5000_Stimuli/." "$root/" \
+        && rm -rf "$root/BOLD5000_Stimuli" "$zip" \
+        && has_files "$dest" 4916; then
+        ok "BOLD5000 download complete."
+        COMPLETED_DOWNLOADS+=("BOLD5000")
+    else
+        err "BOLD5000 download failed. Download BOLD5000_Stimuli.zip manually from:"
+        info "  https://bold5000-dataset.github.io/website/download.html"
+        info "and extract the contents of its BOLD5000_Stimuli/ folder into:"
+        info "  $root/"
+        FAILED_DOWNLOADS+=("BOLD5000")
+    fi
 }
 
 # ── BOLD Moments Dataset (BMD) ────────────────────────────────────────────────
 #
-# Expected layout after download + step 3b preprocessing:
+# stimulus_set.zip (~3 GB) is public to download from https://boldmomentsdataset.csail.mit.edu/stimuli_metadata/
+# but password-protected: the password is at the bottom of stimuli_access.txt in the same folder,
+# after the Moments in Time terms of use, so the user must read the terms and unzip it themselves.
+# annotations.json (BMD video number -> Moments in Time filename) is public on OpenNeuro.
+# Expected layout after download + unzip:
 #   $DATASETS_ROOT/BOLDMomentsDataset/derivatives/stimuli_metadata/
 #     annotations.json
-#     mp4_h264/*/          (1102 mp4 videos)
-#     frames_middle/*.jpg  (created by step 3b: extract_frames_bmd.py)
-#     frames/*/            (created by step 3b: extract_frames_bmd.py)
+#     mp4_h264/*.mp4               (1102 mp4 videos, named 0001.mp4 .. 1102.mp4)
+#     frames/XXXX/XXXX_<frame>_<nframes>.jpg   (all frames of each video)
+#     frames_middle/XXXX_<frame>_<nframes>.jpg (1102 middle frames)
+#     stimuli/{train,test}/*.mp4   (same videos, split by BMD's train/test)
+
+BMD_STIMULI_URL="https://boldmomentsdataset.csail.mit.edu/stimuli_metadata"
+BMD_ANNOTATIONS_URL="https://s3.amazonaws.com/openneuro.org/ds005165/derivatives/stimuli_metadata/annotations.json"
 
 download_bmd() {
     section "BOLD Moments Dataset (BMD)"
     local dest="$DATASETS_ROOT/BOLDMomentsDataset/derivatives/stimuli_metadata"
-    if has_files "$dest/mp4_h264" 100; then
+    mkdir -p "$dest"
+
+    if [ ! -f "$dest/annotations.json" ]; then
+        info "Downloading BMD annotations.json from OpenNeuro..."
+        curl -fsSL -o "$dest/annotations.json" "$BMD_ANNOTATIONS_URL" \
+            || { err "Failed to download annotations.json"; rm -f "$dest/annotations.json"; }
+    fi
+
+    if has_files "$dest/mp4_h264" 1102 && has_files "$dest/frames_middle" 1102 \
+        && [ -f "$dest/annotations.json" ]; then
         ok "BMD stimuli already present — skipping."
         SKIPPED_DOWNLOADS+=("BMD")
         return
     fi
-    warn "BMD stimuli require manual download."
-    info "Follow the download instructions at:"
-    info "  https://github.com/blahner/BOLDMomentsDataset"
-    info "Download the mp4 videos and place them at:"
-    info "  $dest/mp4_h264/"
-    info "Also download annotations.json to:"
-    info "  $dest/annotations.json"
+
+    local zip="$dest/stimulus_set.zip"
+    if [ ! -f "$zip" ]; then
+        info "Downloading BMD stimulus_set.zip (~3 GB)..."
+        curl -fL --progress-bar -o "$zip.part" "$BMD_STIMULI_URL/stimulus_set.zip" && mv "$zip.part" "$zip" \
+            || { err "Failed to download stimulus_set.zip"; rm -f "$zip.part"; FAILED_DOWNLOADS+=("BMD"); return; }
+    fi
+    warn "BMD stimulus_set.zip is password-protected and must be unzipped manually."
+    info "1. Read the terms of use; the password is at the end:"
+    info "     $BMD_STIMULI_URL/stimuli_access.txt"
+    info "2. Unzip (you'll be prompted for the password) and move its contents into place:"
+    info "     unzip $zip -d $dest"
+    info "     mv $dest/stimulus_set/* $dest/ && rmdir $dest/stimulus_set && rm $zip"
     MANUAL_DOWNLOADS+=("BMD")
 }
 
 # ── Generic Object Decoding + Deeprecon ───────────────────────────────────────
 #
-# GOD and Deeprecon share the same task stimuli (ImageNet images).
+# GOD and Deeprecon share the same natural task stimuli (1250 ImageNet images).
+# These are stored ONCE, under GOD; deeprecon's copy step reads them from there.
+# Deeprecon additionally has artificial shape/letter images (public on figshare)
+# and stimulus_id -> filename maps for all four of its stimulus sets.
 # Expected layout:
 #   $DATASETS_ROOT/GenericObjectDecoding/derivatives/stimuli_metadata/images/
-#     test/*.JPEG      (50 images)
-#     training/*.JPEG  (1200 images)
+#     test/*.JPEG             (50 images)
+#     training/*.JPEG         (1200 images)
+#     image_test_id.csv       (stimulus_id -> filename map)
+#     image_training_id.csv
 #   $DATASETS_ROOT/deeprecon/derivatives/stimuli_metadata/images/
 #     ArtificialImage/*.tiff  (40 images)
 #     LetterImage/*.tif       (10 images)
+#     NaturalImageTraining.tsv, NaturalImageTest.tsv,
+#     ArtificialImage.tsv, LetterImage.tsv   (stimulus_id -> filename maps)
+
+# Deep Image Reconstruction figshare (https://figshare.com/articles/dataset/Deep_Image_Reconstruction/7033577)
+# file IDs, pinned so the download doesn't depend on figshare's listing order.
+DEEPRECON_FIGSHARE_URL="https://ndownloader.figshare.com/files"
+declare -A DEEPRECON_FIGSHARE_TSV=(
+    [NaturalImageTraining.tsv]=14876741   # stimulus_NaturalImageTraining.tsv
+    [NaturalImageTest.tsv]=14876738       # stimulus_NaturalImageTest.tsv
+    [ArtificialImage.tsv]=14876798        # stimulus_ArtificialImage.tsv
+    [LetterImage.tsv]=14876732            # stimulus_LetterImage.tsv
+)
+declare -A DEEPRECON_FIGSHARE_ZIP=(
+    [ArtificialImage]=14876801            # stimulus_ArtificialImage.zip -> ArtificialImage/*.tiff
+    [LetterImage]=14876735                # stimulus_LetterImage.zip     -> LetterImage/*.tif
+)
 
 download_god_deeprecon() {
     section "Generic Object Decoding / Deeprecon"
     local dest_god="$DATASETS_ROOT/GenericObjectDecoding/derivatives/stimuli_metadata/images"
     local dest_dr="$DATASETS_ROOT/deeprecon/derivatives/stimuli_metadata/images"
 
-    if has_files "$dest_god/test" 10 && has_files "$dest_god/training" 100; then
-        ok "GOD task stimuli already present — skipping."
-        SKIPPED_DOWNLOADS+=("GOD-task-stimuli")
+    # -- GOD/deeprecon natural images: copyrighted, only available by request --
+    if has_files "$dest_god/test" 50 && has_files "$dest_god/training" 1200 \
+        && [ -f "$dest_god/image_test_id.csv" ] && [ -f "$dest_god/image_training_id.csv" ]; then
+        ok "GOD/Deeprecon natural images already present — skipping."
+        SKIPPED_DOWNLOADS+=("GOD-natural-images")
     else
-        warn "GOD/Deeprecon task stimuli (ImageNet images) require manual download."
-        info "Follow the download instructions at:"
-        info "  https://github.com/KamitaniLab/GenericObjectDecoding"
-        info "  (or) https://github.com/KamitaniLab/DeepImageReconstruction"
-        info "Place test images at:     $dest_god/test/"
-        info "Place training images at: $dest_god/training/"
-        MANUAL_DOWNLOADS+=("GOD-task-stimuli")
+        warn "GOD/Deeprecon natural images (1250 ImageNet images) require a request form."
+        info "1. Fill out the Kamitani Lab request form (linked from"
+        info "   https://github.com/KamitaniLab/GenericObjectDecoding):"
+        info "     https://forms.gle/ujvA34948Xg49jdn9"
+        info "   A reply arrives by email right away with a Google Drive link and a zip password."
+        info "2. Download the zip using the file ID from the Drive link"
+        info "   (https://drive.google.com/file/d/<FILE_ID>/view):"
+        info "     uv tool run gdown <FILE_ID> -O \$TMP/"
+        info "3. Unzip it (you'll be prompted for the password). It extracts to images/ containing"
+        info "   test/, training/, image_test_id.csv and image_training_id.csv. Move it into place:"
+        info "     unzip \$TMP/images.zip -d \$TMP/"
+        info "     mkdir -p $(dirname "$dest_god")"
+        info "     mv \$TMP/images $dest_god"
+        MANUAL_DOWNLOADS+=("GOD-natural-images")
     fi
 
-    if has_files "$dest_dr/ArtificialImage" 1 && has_files "$dest_dr/LetterImage" 1; then
-        ok "Deeprecon artificial/letter stimuli already present — skipping."
-        SKIPPED_DOWNLOADS+=("Deeprecon-artificial-stimuli")
+    # -- Deeprecon artificial/letter images + stimulus maps: public on figshare --
+    local need=0 name
+    has_files "$dest_dr/ArtificialImage" 40 || need=1
+    has_files "$dest_dr/LetterImage" 10 || need=1
+    for name in "${!DEEPRECON_FIGSHARE_TSV[@]}"; do
+        [ -f "$dest_dr/$name" ] || need=1
+    done
+    if [ "$need" -eq 0 ]; then
+        ok "Deeprecon artificial/letter images and stimulus maps already present — skipping."
+        SKIPPED_DOWNLOADS+=("Deeprecon-figshare")
+        return
+    fi
+
+    info "Downloading Deeprecon artificial/letter images and stimulus maps from figshare..."
+    mkdir -p "$dest_dr"
+    local failed=0
+    for name in "${!DEEPRECON_FIGSHARE_TSV[@]}"; do
+        [ -f "$dest_dr/$name" ] && continue
+        curl -fsSL -o "$dest_dr/$name" "$DEEPRECON_FIGSHARE_URL/${DEEPRECON_FIGSHARE_TSV[$name]}" \
+            || { err "Failed to download $name"; rm -f "$dest_dr/$name"; failed=1; }
+    done
+    for name in "${!DEEPRECON_FIGSHARE_ZIP[@]}"; do
+        has_files "$dest_dr/$name" 1 && continue
+        local zip="$dest_dr/$name.zip"
+        curl -fsSL -o "$zip" "$DEEPRECON_FIGSHARE_URL/${DEEPRECON_FIGSHARE_ZIP[$name]}" \
+            && unzip -q -o "$zip" -d "$dest_dr" && rm "$zip" \
+            || { err "Failed to download/extract $name images"; failed=1; }
+    done
+
+    if [ "$failed" -eq 0 ] && has_files "$dest_dr/ArtificialImage" 40 && has_files "$dest_dr/LetterImage" 10; then
+        ok "Deeprecon figshare download complete."
+        COMPLETED_DOWNLOADS+=("Deeprecon-figshare")
     else
-        warn "Deeprecon artificial/letter stimuli require manual download."
-        info "Download from: https://github.com/KamitaniLab/DeepImageReconstruction"
-        info "Place .tiff files at: $dest_dr/ArtificialImage/"
-        info "Place .tif  files at: $dest_dr/LetterImage/"
-        MANUAL_DOWNLOADS+=("Deeprecon-artificial-stimuli")
+        err "Deeprecon figshare download incomplete. Files are listed at:"
+        info "  https://figshare.com/articles/dataset/Deep_Image_Reconstruction/7033577"
+        FAILED_DOWNLOADS+=("Deeprecon-figshare")
     fi
 }
 
@@ -177,57 +276,123 @@ download_god_deeprecon() {
 #   derivatives/stimuli_metadata/frames_middle/*.jpg  (created by step 3b)
 #   derivatives/stimuli_metadata/frames/*/            (created by step 3b)
 
+# The stimuli are pinned to the OpenNeuro ds004488 v1.1.1 snapshot used for MOSAIC
+# (category folders and filenames contain spaces, e.g. "Arm wrestling/v_Arm wrestling_id_...mp4").
+# Each file is fetched from the versioned OpenNeuro S3 bucket by the versionId recorded in
+# had_stimuli_v1.1.1_manifest.tsv and checked against its md5, so no AWS CLI is needed.
+
+HAD_MANIFEST="${PROJECT_ROOT}/src/fmriDatasetPreparation/datasets/HumanActionsDataset/download/had_stimuli_v1.1.1_manifest.tsv"
+
 download_had() {
     section "Human Actions Dataset (HAD)"
     local dest="$DATASETS_ROOT/HumanActionsDataset/Nifti/stimuli"
-    if has_files "$dest" 100; then
+    if has_files "$dest" 21600; then
         ok "HAD stimuli already present — skipping."
         SKIPPED_DOWNLOADS+=("HAD")
         return
     fi
-    if [ -n "${NO_AWS}" ]; then
-        warn "AWS CLI not available — skipping automated HAD download."
-        info "Install the AWS CLI, then re-run this script, or download manually:"
-        info "  aws s3 sync --no-sign-request s3://openneuro.org/ds004488/stimuli/ \\"
-        info "    $dest/"
-        MANUAL_DOWNLOADS+=("HAD")
-        return
-    fi
-    info "Downloading HAD stimuli from OpenNeuro (~180 categories of mp4 videos)..."
+    info "Downloading the 21600 HAD stimulus videos (OpenNeuro ds004488 v1.1.1, ~2.2 GB)..."
     mkdir -p "$dest"
-    if aws s3 sync --no-sign-request s3://openneuro.org/ds004488/stimuli/ "$dest/"; then
+    HAD_DEST="$dest" HAD_MANIFEST="$HAD_MANIFEST" uv run --project "${PROJECT_ROOT}" python - <<'PYEOF' 2>&1 | while IFS= read -r line; do info "  $line"; done
+import csv, hashlib, os, sys, urllib.parse, urllib.request
+from concurrent.futures import ThreadPoolExecutor
+dest, manifest = os.environ["HAD_DEST"], os.environ["HAD_MANIFEST"]
+rows = list(csv.DictReader(open(manifest), delimiter="\t"))
+
+def fetch(r):
+    path = os.path.join(dest, r["path"])
+    if os.path.exists(path) and os.path.getsize(path) == int(r["size"]):
+        return None  # already downloaded (safe to re-run after an interruption)
+    url = ("https://s3.amazonaws.com/openneuro.org/ds004488/stimuli/"
+           + urllib.parse.quote(r["path"]) + "?versionId=" + urllib.parse.quote(r["version_id"]))
+    for _ in range(3):
+        try:
+            data = urllib.request.urlopen(url, timeout=60).read()
+            if hashlib.md5(data).hexdigest() == r["md5"]:
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "wb") as f:
+                    f.write(data)
+                return None
+        except Exception:
+            pass
+    return r["path"]
+
+with ThreadPoolExecutor(16) as ex:
+    failed = [p for p in ex.map(fetch, rows) if p]
+print(f"{len(rows) - len(failed)}/{len(rows)} videos present and verified")
+for p in failed[:10]:
+    print(f"failed: {p}")
+sys.exit(1 if failed else 0)
+PYEOF
+    if [ "${PIPESTATUS[0]}" -eq 0 ]; then
         ok "HAD download complete."
         COMPLETED_DOWNLOADS+=("HAD")
     else
-        err "HAD download failed. Check your network connection and retry."
+        err "HAD download incomplete. Re-run this script to retry the remaining videos."
         FAILED_DOWNLOADS+=("HAD")
     fi
 }
 
 # ── THINGS ────────────────────────────────────────────────────────────────────
 #
-# Expected layout after download + identify_experimental_stimuli.ipynb:
-#   $DATASETS_ROOT/THINGS_fmri/derivatives/stimuli_metadata/experimental_images/
-#     *.jpg  (8740 images)
+# images_THINGS.zip (~5 GB, all 26,107 THINGS images) is public to download from the
+# THINGS OSF project (https://osf.io/jum2f/) but password-protected: the password is in
+# password_images.txt on the same project, after the license terms, so the user must
+# read the terms and unzip it themselves. Only the 8740 images shown in THINGS-fMRI
+# (listed in THINGS_fmri/download/THINGS_fmri_filenames.txt) are then copied out.
+# Expected layout after download + unzip + re-running this script:
+#   $DATASETS_ROOT/THINGS_fmri/derivatives/stimuli_metadata/
+#     images/<concept>/*.jpg        (full THINGS database, extracted from the zip)
+#     experimental_images/*.jpg     (the 8740 THINGS-fMRI images)
+
+THINGS_IMAGES_URL="https://osf.io/download/rdxy2/"         # images_THINGS.zip
+THINGS_PASSWORD_URL="https://osf.io/download/j6a3m/"       # password_images.txt
+THINGS_FILENAMES="${PROJECT_ROOT}/src/fmriDatasetPreparation/datasets/THINGS_fmri/download/THINGS_fmri_filenames.txt"
 
 download_things() {
     section "THINGS"
-    local dest="$DATASETS_ROOT/THINGS_fmri/derivatives/stimuli_metadata/experimental_images"
-    if has_files "$dest" 100; then
+    local root="$DATASETS_ROOT/THINGS_fmri/derivatives/stimuli_metadata"
+    local dest="$root/experimental_images"
+    if has_files "$dest" 8740; then
         ok "THINGS stimuli already present — skipping."
         SKIPPED_DOWNLOADS+=("THINGS")
         return
     fi
-    warn "THINGS stimuli require manual download from OSF."
-    info "Option A — download the full THINGS image database (~146 GB):"
-    info "  1. Go to https://osf.io/jum2f/ and download all THINGS images."
-    info "  2. Run the notebook to extract the 8740 experimental images:"
-    info "       src/fmriDatasetPreparation/datasets/THINGS_fmri/download/identify_experimental_stimuli.ipynb"
-    info "  3. Final images will be placed at: $dest/"
-    info ""
-    info "Option B — download only the 8740 experimental images:"
-    info "  Use the filename list to selectively download:"
-    info "    src/fmriDatasetPreparation/datasets/THINGS_fmri/download/THINGS_fmri_filenames.txt"
+
+    # full database extracted -> copy out the experimental images
+    if has_files "$root/images" 8740; then
+        info "Copying the 8740 THINGS-fMRI images into experimental_images/..."
+        mkdir -p "$dest"
+        local f concept missing=0
+        while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            concept="${f%_*}"   # e.g. coat_rack_13s.jpg -> coat_rack
+            cp -n "$root/images/$concept/$f" "$dest/" 2>/dev/null || missing=$((missing+1))
+        done < "$THINGS_FILENAMES"
+        if [ "$missing" -eq 0 ] && has_files "$dest" 8740; then
+            ok "THINGS experimental images ready."
+            COMPLETED_DOWNLOADS+=("THINGS")
+        else
+            err "$missing THINGS-fMRI images were not found under $root/images/."
+            FAILED_DOWNLOADS+=("THINGS")
+        fi
+        return
+    fi
+
+    local zip="$root/images_THINGS.zip"
+    if [ ! -f "$zip" ]; then
+        info "Downloading images_THINGS.zip from OSF (~5 GB)..."
+        mkdir -p "$root"
+        curl -fL --progress-bar -o "$zip.part" "$THINGS_IMAGES_URL" && mv "$zip.part" "$zip" \
+            || { err "Failed to download images_THINGS.zip"; rm -f "$zip.part"; FAILED_DOWNLOADS+=("THINGS"); return; }
+    fi
+    warn "images_THINGS.zip is password-protected and must be unzipped manually."
+    info "1. Read the license terms; the password is at the end:"
+    info "     $THINGS_PASSWORD_URL  (password_images.txt on https://osf.io/jum2f/)"
+    info "2. Unzip (you'll be prompted for the password) and rename the extracted folder:"
+    info "     unzip $zip -d $root"
+    info "     mv $root/object_images $root/images && rm $zip"
+    info "3. Re-run this script to copy the 8740 THINGS-fMRI images into experimental_images/."
     MANUAL_DOWNLOADS+=("THINGS")
 }
 

@@ -3087,7 +3087,6 @@ flyswatter_09s.jpg
 flyswatter_10n.jpg
 flyswatter_11s.jpg
 flyswatter_12s.jpg
-fmri_filenames.txt
 fondue_01s.jpg
 fondue_02s.jpg
 fondue_03s.jpg
