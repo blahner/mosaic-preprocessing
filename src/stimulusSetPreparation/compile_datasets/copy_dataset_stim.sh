@@ -12,3 +12,5 @@ uv run --project "${PROJECT_ROOT}" python ${ROOT}/copy_dataset_stim.py --dataset
 uv run --project "${PROJECT_ROOT}" python ${ROOT}/copy_dataset_stim.py --dataset BOLD5000
 uv run --project "${PROJECT_ROOT}" python ${ROOT}/copy_dataset_stim.py --dataset THINGS_fmri
 uv run --project "${PROJECT_ROOT}" python ${ROOT}/copy_dataset_stim.py --dataset NaturalScenesDataset
+#jpg copies of the deeprecon .tif/.tiff stimuli for models that can't read tiff (saved to MOSAIC/stimuli/tiff2jpg)
+uv run --project "${PROJECT_ROOT}" python ${ROOT}/convert_tiff2jpg.py

@@ -52,7 +52,7 @@ def main(args):
     cols = ['filename', 'alias', 'source', 'test_train']
     cols.extend([f"sub-{s:02}_reps" for s in range(1,5)])
     task="5000scenes"
-    test_stimuli_all_tmp = pd.read_csv(os.path.join(args.dataset_root, "derivatives", "stimuli_metadata", "Scene_Stimuli", "repeated_stimuli_113_list.txt"), header=None).values.flatten().tolist()
+    test_stimuli_all_tmp = pd.read_csv(os.path.join(args.dataset_root, "BOLD5000", "derivatives", "stimuli_metadata", "Scene_Stimuli", "repeated_stimuli_113_list.txt"), header=None).values.flatten().tolist()
     test_stimuli_all = [stim.replace('COCO_train2014_','') for stim in test_stimuli_all_tmp]
     filename = []
     alias = []
@@ -65,14 +65,14 @@ def main(args):
         for session_num in range(1, numsessions+1):
             session = f"ses-{int(session_num):02}"
 
-            sub_func_root = os.path.join(args.dataset_root, "derivatives", "fmriprep", subject, session, "func")
+            sub_func_root = os.path.join(args.dataset_root, "BOLD5000", "derivatives", "fmriprep", subject, session, "func")
             numruns = len(glob.glob(os.path.join(sub_func_root, f"*task-{task}_*confounds_timeseries.tsv")))
             assert(numruns > 0)
             ##Load events and data for each run
             for run in range(1,numruns+1):
                 if args.verbose:
                     print("run:",run)
-                tmp = pd.read_table(os.path.join(args.dataset_root, "Nifti", subject, session, "func", f"{subject}_{session}_task-{task}_run-{run:02}_events.tsv"))
+                tmp = pd.read_table(os.path.join(args.dataset_root, "BOLD5000", "Nifti", subject, session, "func", f"{subject}_{session}_task-{task}_run-{run:02}_events.tsv"))
                 for fname in tmp.loc[:,'stim_file']:
                     fname_noprefix = fname.replace('COCO_train2014_','') #removes the COCO prefix if it exists
                     if fname_noprefix not in filename:
@@ -107,12 +107,12 @@ def main(args):
         for session_num in range(1, numsessions+1):
             session = f"ses-{int(session_num):02}"
 
-            sub_func_root = os.path.join(args.dataset_root, "derivatives", "fmriprep", subject, session, "func")
+            sub_func_root = os.path.join(args.dataset_root, "BOLD5000", "derivatives", "fmriprep", subject, session, "func")
             numruns = len(glob.glob(os.path.join(sub_func_root, f"*task-{task}_*confounds_timeseries.tsv")))
             assert(numruns > 0)
             ##Load events and data for each run
             for run in range(1,numruns+1):
-                tmp = pd.read_table(os.path.join(args.dataset_root, "Nifti", subject, session, "func", f"{subject}_{session}_task-{task}_run-{run:02}_events.tsv"))
+                tmp = pd.read_table(os.path.join(args.dataset_root, "BOLD5000", "Nifti", subject, session, "func", f"{subject}_{session}_task-{task}_run-{run:02}_events.tsv"))
                 for fname in tmp.loc[:,'stim_file']:
                     fname_noprefix = fname.replace('COCO_train2014_','') #removes the COCO prefix if it exists
                     df.loc[df['filename'] == fname_noprefix, f"sub-{sub:02}_reps"] += 1

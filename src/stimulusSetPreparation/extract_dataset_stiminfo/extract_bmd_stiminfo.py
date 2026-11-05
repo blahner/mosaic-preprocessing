@@ -29,7 +29,7 @@ def main(args):
         raise ValueError(f"mosaic root {mosaic_root} doesnt exist but it should.")
     
     #load stimulus annotations to convert XXXX.mp4 filename to original Moments In Time Filename
-    annotations = json.load(open(os.path.join(args.dataset_root,"derivatives", "stimuli_metadata", "annotations.json"), 'r'))
+    annotations = json.load(open(os.path.join(args.dataset_root, "BOLDMomentsDataset", "derivatives", "stimuli_metadata", "annotations.json"), 'r'))
     cols = ['filename', 'alias', 'source', 'test_train']
     cols.extend([f"sub-{s:02}_reps" for s in range(1,11)])
     #first define the pandas dataframe
@@ -67,7 +67,7 @@ def main(args):
                     numruns = 10
                 for run in range(1,numruns+1):
                     #load events
-                    tmp = pd.read_table(os.path.join(args.dataset_root, "Nifti", subject, session, "func", f"{subject}_{session}_task-{task}_run-{run}_events.tsv"))
+                    tmp = pd.read_table(os.path.join(args.dataset_root, "BOLDMomentsDataset", "Nifti", subject, session, "func", f"{subject}_{session}_task-{task}_run-{run}_events.tsv"))
                     for tt in tmp.loc[:,'stim_file']:
                         if str(tt) == "nan":
                             continue

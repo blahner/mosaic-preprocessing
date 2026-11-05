@@ -41,9 +41,9 @@ def main(args):
         print(f"starting {subject}")
         for ses in range(1,numsessions+1):
             session = f"ses-{task}{ses:02}"
-            numruns = len(glob.glob(os.path.join(args.dataset_root, "derivatives", "fmriprep", subject, session, "func", f"{subject}_{session}_task-{task}_run-*_desc-confounds_timeseries.tsv"))) 
+            numruns = len(glob.glob(os.path.join(args.dataset_root, "THINGS_fmri", "derivatives", "fmriprep", subject, session, "func", f"{subject}_{session}_task-{task}_run-*_desc-confounds_timeseries.tsv"))) 
             for run in range(1,numruns+1):
-                tmp = pd.read_table(os.path.join(args.dataset_root, "Nifti", subject, session, "func", f"{subject}_{session}_task-{task}_run-{run:02}_events.tsv"))
+                tmp = pd.read_table(os.path.join(args.dataset_root, "THINGS_fmri", "Nifti", subject, session, "func", f"{subject}_{session}_task-{task}_run-{run:02}_events.tsv"))
                 for idx, img_filename in enumerate(tmp.loc[:,'file_path']):
                     if tmp.loc[idx,'trial_type'] == 'catch':
                         continue
@@ -80,14 +80,14 @@ def main(args):
         print(f"starting {subject}")
         for ses in range(1,numsessions+1):
             session = f"ses-{task}{int(ses):02}"
-            numruns = len(glob.glob(os.path.join(args.dataset_root, "derivatives", "fmriprep", subject, session, "func", f"{subject}_{session}_task-{task}_run-*_desc-confounds_timeseries.tsv")))  #nothing special about the confounds file choice
+            numruns = len(glob.glob(os.path.join(args.dataset_root, "THINGS_fmri", "derivatives", "fmriprep", subject, session, "func", f"{subject}_{session}_task-{task}_run-*_desc-confounds_timeseries.tsv")))  #nothing special about the confounds file choice
             assert(numruns > 0)
             if args.verbose:
                 print(f"Found {numruns} runs for subject {subject} session {session}")
             ##Load eventts and data for each run
             for run in range(1,numruns+1):
                 #load events
-                tmp = pd.read_table(os.path.join(args.dataset_root, "Nifti", subject, session, "func", f"{subject}_{session}_task-{task}_run-{run:02}_events.tsv"))
+                tmp = pd.read_table(os.path.join(args.dataset_root, "THINGS_fmri", "Nifti", subject, session, "func", f"{subject}_{session}_task-{task}_run-{run:02}_events.tsv"))
                 for idx, img_filename in enumerate(tmp.loc[:,'file_path']):
                     if tmp.loc[idx,'trial_type'] == 'catch':
                         continue
@@ -113,7 +113,7 @@ def main(args):
     df.to_csv(os.path.join(mosaic_root, "things_stiminfo.tsv"), sep='\t', index=False)
 
 if __name__ == '__main__':
-    dataset_root_default = os.path.join(os.getenv("DATASETS_ROOT", "/default/path/to/datasets"),"THINGS_fmri") #use default if DATASETS_ROOT env variable is not set.
+    dataset_root_default = os.getenv("DATASETS_ROOT", "/default/path/to/datasets") #use default if DATASETS_ROOT env variable is not set.
 
     #arguments
     parser = argparse.ArgumentParser()

@@ -80,7 +80,7 @@ def main(args):
 
     for sub in range(1,31):
         subject = f"sub-{int(sub):02}"
-        session_path = os.path.join(args.dataset_root, "derivatives", "fmriprep", subject)
+        session_path = os.path.join(args.dataset_root, "NaturalObjectDataset", "derivatives", "fmriprep", subject)
         sessions_tmp = sorted(glob.glob(os.path.join(session_path, f"*imagenet*"))) + sorted(glob.glob(os.path.join(session_path, f"*coco*")))  #compile all the session numbers
         assert(len(sessions_tmp) > 0)
         sessions = []
@@ -106,14 +106,14 @@ def main(args):
             else:
                 raise ValueError("Invalid task name. Must be either coco or imagenet session.")
 
-            numruns = len(glob.glob(os.path.join(args.dataset_root, "derivatives", "fmriprep", subject, session, "func", f"{subject}_{session}_task-{task}_run-*_desc-confounds_timeseries.tsv")))  #nothing special about the confounds file choice
+            numruns = len(glob.glob(os.path.join(args.dataset_root, "NaturalObjectDataset", "derivatives", "fmriprep", subject, session, "func", f"{subject}_{session}_task-{task}_run-*_desc-confounds_timeseries.tsv")))  #nothing special about the confounds file choice
             assert(numruns > 0)
             if args.verbose:
                 print(f"Found {numruns} runs for subject {subject} session {session}")
 
             ##Load eventts and data for each run
             for run in range(1,numruns+1):
-                tmp = pd.read_table(os.path.join(args.dataset_root, "Nifti", subject, session, "func", f"{subject}_{session}_task-{task}_run-{run:02}_events.tsv"))
+                tmp = pd.read_table(os.path.join(args.dataset_root, "NaturalObjectDataset", "Nifti", subject, session, "func", f"{subject}_{session}_task-{task}_run-{run:02}_events.tsv"))
                 for stim_id in tmp.loc[:,events_stim_field]:
                     if str(stim_id) == 'nan': #for coco subject 1, blank trials are not input into the events file. for subjects 2-9, they are listed as n/a conditions with their own onsets
                         continue

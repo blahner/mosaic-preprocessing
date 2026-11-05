@@ -1,6 +1,8 @@
 from dotenv import load_dotenv
 load_dotenv()
 import os
+import glob
+import shutil
 from tqdm import tqdm
 import cv2
 
@@ -29,8 +31,10 @@ def extract_frames(video_path, output_folder):
 dataset_root = os.path.join(os.getenv('DATASETS_ROOT'),"HumanActionsDataset")
 stim_root = os.path.join(dataset_root, "Nifti", "stimuli")
 save_root = os.path.join(dataset_root, "derivatives", "stimuli_metadata", "frames")
-if not os.path.exists(save_root):
-    os.makedirs(save_root)
+middle_root = os.path.join(dataset_root, "derivatives", "stimuli_metadata", "frames_middle") #middle frame of each video, convenient for visualizations
+for d in [save_root, middle_root]:
+    if not os.path.exists(d):
+        os.makedirs(d)
 
 cat_dirs = os.listdir(stim_root)
 assert(len(cat_dirs) == 180)
@@ -43,6 +47,14 @@ for cat in tqdm(cat_dirs, total=len(cat_dirs)):
     assert(len(vid_dirs) == 120)
     for vid in vid_dirs:
         video_path = os.path.join(stim_root, cat, vid)
-        video_noext = vid.split('.mp4')[0]
+        video_noext = vid.split('.mp4')[0] #lots of HAD videos have periods in the filename so Path(vid).stem doesnt work
         output_folder = os.path.join(save_root, cat, video_noext)
+        if glob.glob(os.path.join(middle_root, f"{video_noext}_frame-*.jpg")):
+            continue #already extracted (safe to re-run after an interruption)
         extract_frames(video_path, output_folder)
+
+        #copy the middle frame, named <video>_frame-<middle>_<total>.jpg like the frames in MOSAIC/stimuli/frames
+        frames = sorted(glob.glob(os.path.join(output_folder, "*.jpg")))
+        assert(len(frames) > 0), f"no frames extracted from {video_path}"
+        middle_frame = frames[len(frames)//2 - 1] if len(frames) > 1 else frames[0] #frame number len(frames)//2 (1-indexed)
+        shutil.copyfile(middle_frame, os.path.join(middle_root, f"{video_noext}_{os.path.basename(middle_frame)}"))

@@ -44,7 +44,7 @@ def main(args):
             print(f"Loading subject {subject}")
         for run in range(1,numruns+1):
             #load events
-            tmp = pd.read_table(os.path.join(args.dataset_root, "Nifti", subject, session, "func", f"{subject}_{session}_task-action_run-{run:02d}_events.tsv"))
+            tmp = pd.read_table(os.path.join(args.dataset_root, "HumanActionsDataset", "Nifti", subject, session, "func", f"{subject}_{session}_task-action_run-{run:02d}_events.tsv"))
             for tt in tmp.loc[:,'stim_file']:
                 _, fname_ext = tt.split("/")
                 if fname_ext in all_filenames:
@@ -73,7 +73,7 @@ def main(args):
             print(f"Loading subject {subject}")
         for run in range(1,numruns+1):
             #load events
-            tmp = pd.read_table(os.path.join(args.dataset_root, "Nifti", subject, session, "func", f"{subject}_{session}_task-action_run-{run:02d}_events.tsv"))
+            tmp = pd.read_table(os.path.join(args.dataset_root, "HumanActionsDataset", "Nifti", subject, session, "func", f"{subject}_{session}_task-action_run-{run:02d}_events.tsv"))
             for tt in tmp.loc[:,'stim_file']:
                 _, fname_ext = tt.split("/")
                 if fname_ext in all_filenames:

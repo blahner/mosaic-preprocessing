@@ -33,8 +33,8 @@ def main(args):
     cols.extend([f"sub-{s:02}_reps" for s in range(1,6)])
     task = 'perception'
 
-    test_map = pd.read_csv(os.path.join(args.dataset_root, "derivatives", "stimuli_metadata", "images", "image_test_id.csv"), names=['stim_id', 'filename'])
-    train_map = pd.read_csv(os.path.join(args.dataset_root, "derivatives", "stimuli_metadata", "images", "image_training_id.csv"), names=['stim_id', 'filename'])   
+    test_map = pd.read_csv(os.path.join(args.dataset_root, "GenericObjectDecoding", "derivatives", "stimuli_metadata", "images", "image_test_id.csv"), names=['stim_id', 'filename'])
+    train_map = pd.read_csv(os.path.join(args.dataset_root, "GenericObjectDecoding", "derivatives", "stimuli_metadata", "images", "image_training_id.csv"), names=['stim_id', 'filename'])   
 
     filename = []
     source = []
@@ -43,20 +43,20 @@ def main(args):
     for sub in range(1,6):
         subject = f"sub-{int(sub):02}"
         print(f"starting {subject}")
-        sessions = sorted(glob.glob(os.path.join(args.dataset_root, "derivatives", "fmriprep", subject, f"ses-{task}*"))) #compile all the session numbers that have at least one run from this task
+        sessions = sorted(glob.glob(os.path.join(args.dataset_root, "GenericObjectDecoding", "derivatives", "fmriprep", subject, f"ses-{task}*"))) #compile all the session numbers that have at least one run from this task
         assert(len(sessions) > 0)
         session_name = []
         for s in sessions:
             session_name.append(s.split("/")[-1])
         assert(len(session_name) > 0)
         for session in session_name:
-            numruns = len(glob.glob(os.path.join(args.dataset_root, "derivatives", "fmriprep", subject, session, "func", f"{subject}_{session}_task-{task}_run-*_desc-confounds_timeseries.tsv")))  #nothing special about the confounds file choice
+            numruns = len(glob.glob(os.path.join(args.dataset_root, "GenericObjectDecoding", "derivatives", "fmriprep", subject, session, "func", f"{subject}_{session}_task-{task}_run-*_desc-confounds_timeseries.tsv")))  #nothing special about the confounds file choice
             assert(numruns > 0)
             if args.verbose:
                 print(f"Found {numruns} runs for subject {subject} session {session}")
     
             for run in range(1,numruns+1):
-                tmp = pd.read_table(os.path.join(args.dataset_root, "Nifti", subject, session, "func", f"{subject}_{session}_task-{task}_run-{run:02}_events.tsv"))
+                tmp = pd.read_table(os.path.join(args.dataset_root, "GenericObjectDecoding", "Nifti", subject, session, "func", f"{subject}_{session}_task-{task}_run-{run:02}_events.tsv"))
                 stim_id_prev = 0
                 for stim_id in tmp.loc[:,'stim_id']:
                     if np.isnan(stim_id) or (stim_id == stim_id_prev):
@@ -90,21 +90,21 @@ def main(args):
     for sub in range(1,6):
         subject = f"sub-{int(sub):02}"
         print(f"starting {subject}")
-        sessions = sorted(glob.glob(os.path.join(args.dataset_root, "derivatives", "fmriprep", subject, f"ses-{task}*"))) #compile all the session numbers that have at least one run from this task
+        sessions = sorted(glob.glob(os.path.join(args.dataset_root, "GenericObjectDecoding", "derivatives", "fmriprep", subject, f"ses-{task}*"))) #compile all the session numbers that have at least one run from this task
         assert(len(sessions) > 0)
         session_name = []
         for s in sessions:
             session_name.append(s.split("/")[-1])
         assert(len(session_name) > 0)
         for session in session_name:
-            numruns = len(glob.glob(os.path.join(args.dataset_root, "derivatives", "fmriprep", subject, session, "func", f"{subject}_{session}_task-{task}_run-*_desc-confounds_timeseries.tsv")))  #nothing special about the confounds file choice
+            numruns = len(glob.glob(os.path.join(args.dataset_root, "GenericObjectDecoding", "derivatives", "fmriprep", subject, session, "func", f"{subject}_{session}_task-{task}_run-*_desc-confounds_timeseries.tsv")))  #nothing special about the confounds file choice
             assert(numruns > 0)
             if args.verbose:
                 print(f"Found {numruns} runs for subject {subject} session {session}")
     
             ##Load eventts and data for each run
             for run in range(1,numruns+1):
-                tmp = pd.read_table(os.path.join(args.dataset_root, "Nifti", subject, session, "func", f"{subject}_{session}_task-{task}_run-{run:02}_events.tsv"))
+                tmp = pd.read_table(os.path.join(args.dataset_root, "GenericObjectDecoding", "Nifti", subject, session, "func", f"{subject}_{session}_task-{task}_run-{run:02}_events.tsv"))
                 stim_id_prev = 0
                 for stim_id in tmp.loc[:,'stim_id']:
                     if np.isnan(stim_id) or (stim_id == stim_id_prev):

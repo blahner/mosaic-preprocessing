@@ -9,8 +9,8 @@
 #   - DATASETS_ROOT and PROJECT_ROOT must be set (define them in your .env file)
 #   - AWS CLI installed and configured for unauthenticated S3 access
 #     (used for NOD and NSD); `uv tool install awscli` works
-#   - uv installed, and `uv sync` already run in PROJECT_ROOT (the NSD step
-#     runs a small pandas snippet through `uv run`)
+#   - uv installed, and `uv sync` already run in PROJECT_ROOT (the HAD step
+#     runs a small python downloader through `uv run`)
 #
 # What this script does:
 #   - Automatically downloads stimuli that are hosted on public S3 (NOD, NSD) and the pinned HAD v1.1.1 videos
@@ -437,8 +437,10 @@ download_nod() {
 #   $DATASETS_ROOT/NaturalScenesDataset/derivatives/stimuli_metadata/
 #     nsd_stimuli.hdf5               (~39 GB — all 73000 COCO images)
 #     nsdsynthetic_stimuli.hdf5      (~640 MB — needed by step 3b notebook)
+#     nsdsynthetic_colorstimuli_subj0{1..8}.hdf5  (~186 MB each — subject-specific color
+#                                    images, averaged across subjects by the step 3b notebook)
 #     nsd_stim_info_merged.csv
-#     notshown.tsv                   (derived from nsd_stim_info_merged.csv)
+#     notshown.tsv                   (1-indexed nsdIds of the 2434 images never shown)
 #     annotations_trainval2017/
 #       annotations/
 #         instances_train2017.json
@@ -448,7 +450,10 @@ download_nod() {
 download_nsd() {
     section "Natural Scenes Dataset (NSD)"
     local dest="$DATASETS_ROOT/NaturalScenesDataset/derivatives/stimuli_metadata"
-    if has_files "$dest" 3 && [ -f "$dest/nsd_stimuli.hdf5" ]; then
+    if [ -f "$dest/nsd_stimuli.hdf5" ] && [ -f "$dest/nsdsynthetic_stimuli.hdf5" ] \
+        && [ -f "$dest/nsd_stim_info_merged.csv" ] && [ -s "$dest/notshown.tsv" ] \
+        && [ "$(ls "$dest"/nsdsynthetic_colorstimuli_subj0*.hdf5 2>/dev/null | wc -l)" -eq 8 ] \
+        && [ -f "$dest/annotations_trainval2017/annotations/instances_train2017.json" ]; then
         ok "NSD stimuli already present — skipping."
         SKIPPED_DOWNLOADS+=("NSD")
         return
@@ -463,52 +468,26 @@ download_nsd() {
     info "Downloading NSD stimuli from S3 (~40 GB total — this will take a while)..."
     mkdir -p "$dest"
 
-    local failed=0
-
-    # S3 key confirmed: nsddata_stimuli/stimuli/nsd/nsd_stimuli.hdf5
-    info "  [1/5] nsd_stimuli.hdf5 (~39 GB)"
-    aws s3 cp --no-sign-request \
-        s3://natural-scenes-dataset/nsddata_stimuli/stimuli/nsd/nsd_stimuli.hdf5 \
-        "$dest/nsd_stimuli.hdf5" || { err "Failed to download nsd_stimuli.hdf5"; failed=1; }
-
-    # S3 key confirmed: nsddata_stimuli/stimuli/nsdsynthetic/nsdsynthetic_stimuli.hdf5
-    info "  [2/5] nsdsynthetic_stimuli.hdf5 (~640 MB, needed for step 3b)"
-    aws s3 cp --no-sign-request \
-        s3://natural-scenes-dataset/nsddata_stimuli/stimuli/nsdsynthetic/nsdsynthetic_stimuli.hdf5 \
-        "$dest/nsdsynthetic_stimuli.hdf5" || { err "Failed to download nsdsynthetic_stimuli.hdf5"; failed=1; }
-
-    # S3 key confirmed: nsddata/experiments/nsd/nsd_stim_info_merged.csv
-    info "  [3/5] nsd_stim_info_merged.csv"
-    aws s3 cp --no-sign-request \
-        s3://natural-scenes-dataset/nsddata/experiments/nsd/nsd_stim_info_merged.csv \
-        "$dest/nsd_stim_info_merged.csv" || { err "Failed to download nsd_stim_info_merged.csv"; failed=1; }
-
-    # notshown.tsv is not distributed by NSD — derive it from nsd_stim_info_merged.csv.
-    # It lists the 1-indexed nsdIds of images never shown to any subject (all trial counts = 0).
-    info "  [4/5] notshown.tsv (derived from nsd_stim_info_merged.csv)"
-    if [ -f "$dest/nsd_stim_info_merged.csv" ]; then
-        NSD_DEST="$dest" uv run --project "${PROJECT_ROOT}" python - <<'PYEOF' 2>&1 | while IFS= read -r line; do info "    $line"; done
-import os, pandas as pd
-dest = os.environ.get("NSD_DEST")
-csv_path = os.path.join(dest, "nsd_stim_info_merged.csv")
-df = pd.read_csv(csv_path)
-# subject columns track how many times each image was shown per subject
-subj_cols = [c for c in df.columns if c.startswith("subject") and c[7:].isdigit()]
-not_shown = df.index[df[subj_cols].sum(axis=1) == 0].tolist()
-# nsdId in the CSV is 0-indexed; notshown.tsv uses 1-indexed nsdIds
-not_shown_1indexed = [i + 1 for i in not_shown]
-out_path = os.path.join(dest, "notshown.tsv")
-pd.DataFrame(not_shown_1indexed).to_csv(out_path, index=False, header=False)
-print(f"Wrote {len(not_shown_1indexed)} not-shown image IDs to {out_path}")
-PYEOF
-    else
-        warn "nsd_stim_info_merged.csv not available — cannot derive notshown.tsv yet."
-        warn "Re-run this script after step [3/5] succeeds to generate notshown.tsv."
-        failed=1
-    fi
+    local failed=0 n=0 key file
+    # each file is skipped if already present, so re-running only fetches what's missing
+    for key in \
+        nsddata_stimuli/stimuli/nsd/nsd_stimuli.hdf5 \
+        nsddata_stimuli/stimuli/nsdsynthetic/nsdsynthetic_stimuli.hdf5 \
+        nsddata/experiments/nsd/nsd_stim_info_merged.csv \
+        nsddata/stimuli/nsd/notshown.tsv \
+        nsddata_stimuli/stimuli/nsdsynthetic/nsdsynthetic_colorstimuli_subj0{1..8}.hdf5; do
+        n=$((n+1)); file="$(basename "$key")"
+        info "  [$n/13] $file"
+        if [ -s "$dest/$file" ]; then
+            ok "$file already present — skipping."
+            continue
+        fi
+        aws s3 cp --no-sign-request "s3://natural-scenes-dataset/$key" "$dest/$file" \
+            || { err "Failed to download $file"; rm -f "$dest/$file"; failed=1; }
+    done
 
     # COCO annotations come from the COCO website, not the NSD S3 bucket.
-    info "  [5/5] COCO 2017 annotations"
+    info "  [13/13] COCO 2017 annotations"
     local coco_zip="$dest/annotations_trainval2017.zip"
     local coco_url="http://images.cocodataset.org/annotations/annotations_trainval2017.zip"
     if [ ! -f "$dest/annotations_trainval2017/annotations/instances_train2017.json" ]; then
@@ -541,21 +520,21 @@ _nsd_manual_instructions() {
     info "  aws s3 cp --no-sign-request \\"
     info "    s3://natural-scenes-dataset/nsddata_stimuli/stimuli/nsdsynthetic/nsdsynthetic_stimuli.hdf5 \\"
     info "    $dest/nsdsynthetic_stimuli.hdf5"
+    info "  # NSD synthetic subject-specific color stimuli (8 x ~186 MB, needed for step 3b):"
+    info "  for s in 1 2 3 4 5 6 7 8; do aws s3 cp --no-sign-request \\"
+    info "    s3://natural-scenes-dataset/nsddata_stimuli/stimuli/nsdsynthetic/nsdsynthetic_colorstimuli_subj0\$s.hdf5 \\"
+    info "    $dest/; done"
     info "  # Stimulus metadata CSV:"
     info "  aws s3 cp --no-sign-request \\"
     info "    s3://natural-scenes-dataset/nsddata/experiments/nsd/nsd_stim_info_merged.csv \\"
     info "    $dest/nsd_stim_info_merged.csv"
+    info "  # 1-indexed nsdIds of the images never shown (subjects that didn't finish all sessions):"
+    info "  aws s3 cp --no-sign-request \\"
+    info "    s3://natural-scenes-dataset/nsddata/stimuli/nsd/notshown.tsv \\"
+    info "    $dest/notshown.tsv"
     info "  # COCO 2017 annotations (from cocodataset.org):"
     info "  curl -L -o /tmp/coco_ann.zip http://images.cocodataset.org/annotations/annotations_trainval2017.zip"
     info "  unzip /tmp/coco_ann.zip -d $dest/annotations_trainval2017"
-    info "  # notshown.tsv (derive from CSV after downloading it):"
-    info "  NSD_DEST=$dest uv run --project $PROJECT_ROOT python -c \""
-    info "    import os, pandas as pd; dest=os.environ['NSD_DEST']"
-    info "    df=pd.read_csv(os.path.join(dest,'nsd_stim_info_merged.csv'))"
-    info "    cols=[c for c in df.columns if c.startswith('subject') and c[7:].isdigit()]"
-    info "    ids=[i+1 for i in df.index[df[cols].sum(1)==0].tolist()]"
-    info "    pd.DataFrame(ids).to_csv(os.path.join(dest,'notshown.tsv'),index=False,header=False)"
-    info "    \""
     info "Browse the full NSD S3 bucket at:"
     info "  https://natural-scenes-dataset.s3.amazonaws.com/index.html"
 }

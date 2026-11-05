@@ -109,15 +109,15 @@ aws --version            #check it is on your PATH
 
 The script handles each dataset as follows:
 - **BOLD5000**: auto-downloads `BOLD5000_Stimuli.zip` (~1.2 GB) via `curl` from the Dropbox link on https://bold5000-dataset.github.io/website/download.html
-- **BOLD Moments Dataset (BMD)**: auto-downloads `annotations.json` from OpenNeuro and the password-protected `stimulus_set.zip` (~3 GB, includes the videos and pre-extracted frames) from https://boldmomentsdataset.csail.mit.edu/stimuli_metadata/, then prints instructions to read the terms of use in `stimuli_access.txt` (which ends with the password) and unzip it
-- **Generic Object Decoding (GOD) + Deeprecon** (shared set of 1250 natural ImageNet images, stored once under `GenericObjectDecoding/`): prints instructions for the Kamitani Lab request form (https://forms.gle/ujvA34948Xg49jdn9, linked from https://github.com/KamitaniLab/GenericObjectDecoding). The reply email is immediate and contains a Google Drive link and zip password; download with `uv tool run gdown <FILE_ID>` (the ID from the Drive link) and unzip.
+- **BOLD Moments Dataset (BMD)**: auto-downloads `annotations.json` from OpenNeuro and the password-protected `stimulus_set.zip` (~3 GB, includes the videos and pre-extracted frames) from https://boldmomentsdataset.csail.mit.edu/stimuli_metadata/, then prints instructions to read the terms of use in `stimuli_access.txt` (which ends with the password), unzip it, and move its contents into `BOLDMomentsDataset/derivatives/stimuli_metadata/`
+- **Generic Object Decoding (GOD) + Deeprecon** (shared set of 1250 natural ImageNet images, stored once under `GenericObjectDecoding/`): prints instructions for the Kamitani Lab request form (https://forms.gle/ujvA34948Xg49jdn9, linked from https://github.com/KamitaniLab/GenericObjectDecoding). The reply email is immediate and contains a Google Drive link and zip password; download with `uv tool run gdown <FILE_ID>` (the ID from the Drive link), unzip, and move the extracted `images/` folder into `GenericObjectDecoding/derivatives/stimuli_metadata/`.
 - **Deeprecon artificial shapes + letters**: auto-downloads the 50 images and all four stimulus-ID maps from the [Deep Image Reconstruction figshare](https://figshare.com/articles/dataset/Deep_Image_Reconstruction/7033577) via `curl`
 - **Human Actions Dataset (HAD)**: auto-downloads the 21600 stimulus videos (~2.2 GB) from OpenNeuro, pinned to the ds004488 v1.1.1 snapshot used for MOSAIC. Each file is fetched by the S3 version ID listed in `src/fmriDatasetPreparation/datasets/HumanActionsDataset/download/had_stimuli_v1.1.1_manifest.tsv` and verified against its md5
-- **THINGS**: auto-downloads the password-protected `images_THINGS.zip` (~5 GB, all 26,107 THINGS images) from https://osf.io/jum2f/, then prints instructions to read the license terms in `password_images.txt` (which ends with the password) and unzip it. Re-running the script then copies the 8740 images shown in THINGS-fMRI (listed in `src/fmriDatasetPreparation/datasets/THINGS_fmri/download/THINGS_fmri_filenames.txt`) into `experimental_images/`
+- **THINGS**: auto-downloads the password-protected `images_THINGS.zip` (~5 GB, all 26,107 THINGS images) from https://osf.io/jum2f/, then prints instructions to read the license terms in `password_images.txt` (which ends with the password), unzip it, and rename the extracted `object_images/` folder to `images/`. Re-running the script then copies the 8740 images shown in THINGS-fMRI (listed in `src/fmriDatasetPreparation/datasets/THINGS_fmri/download/THINGS_fmri_filenames.txt`) into `experimental_images/`
 - **Natural Object Dataset (NOD)**: auto-downloads via `aws s3 sync` from OpenNeuro
-- **Natural Scenes Dataset (NSD)**: auto-downloads via `aws s3 cp` from the NSD S3 bucket (~39 GB for the stimuli HDF5)
+- **Natural Scenes Dataset (NSD)**: auto-downloads via `aws s3 cp` from the NSD S3 bucket (~39 GB for the stimuli HDF5, plus the NSD synthetic stimuli HDF5s needed in step b)
 
-The script skips any dataset whose stimuli are already present, so it is safe to re-run after completing manual downloads.
+For every manual step, the script prints the exact commands to run. It skips any dataset (and any individual file) that is already present, so it is safe to re-run after completing manual downloads; re-run it until the summary reports that all stimuli are ready.
 
 INPUTS: None  
 OUTPUTS: stimulus set downloaded in each dataset-specific folder.
@@ -128,10 +128,10 @@ uv run python src/stimulusSetPreparation/video_frame_extraction/extract_frames_h
 src/stimulusSetPreparation/compile_datasets/save_nsdsynthetic_stimuli.ipynb
 ```
 
-INPUTS: mp4 videos and nsd synthetic stimuli .hdf5 file in dataset-specific folder  
+INPUTS: HAD mp4 videos and NSD synthetic stimuli .hdf5 files in dataset-specific folders  
 OUTPUTS: jpg video frames and jpg nsd synthetic stimuli in dataset-specific folder
 
-c. Next, move all stimuli into MOSAIC stimulus folder. Here, the order you move the stimuli into this folder might matter if the stimuli share the same filename. For some datasets, this script also changes the stimulus filenames from a dataset-specific naming convention used in the dataset's release to an original source filename. For example, BMD releasese videos named 0001.mp4 to 1102.mp4, for example, but in this script these filenames are reverted back to its original filename from the source Multi-Moments in Time dataset.
+c. Next, move all stimuli into MOSAIC stimulus folder. Only run this once steps a and b are complete for all eight datasets: `copy_dataset_stim.sh` copies every dataset in a fixed order and checks each dataset's expected file counts. Here, the order you move the stimuli into this folder might matter if the stimuli share the same filename. For some datasets, this script also changes the stimulus filenames from a dataset-specific naming convention used in the dataset's release to an original source filename. For example, BMD releases videos named 0001.mp4 to 1102.mp4, for example, but in this script these filenames are reverted back to its original filename from the source Multi-Moments in Time dataset.
 ```
 bash src/stimulusSetPreparation/compile_datasets/copy_dataset_stim.sh
 ```
@@ -139,7 +139,7 @@ bash src/stimulusSetPreparation/compile_datasets/copy_dataset_stim.sh
 INPUTS: stimuli in their dataset specific folder  
 OUTPUTS: stimuli in the MOSAIC stimuli folder
 
-A final note, some models do not accept .tif or .tiff file formats as inputs. So, for the Deeprecon artificial stimuli that have a .tif and .tiff extension, I use an online tiff-to-jpg converter to quickly get jpg versions of these stimuli and put them in a folder inside MOSAIC/stimuli/.
+Some models do not accept .tif or .tiff file formats as inputs, so the last line of `copy_dataset_stim.sh` runs `convert_tiff2jpg.py`, which saves .jpg copies of the Deeprecon artificial (.tiff) and letter (.tif) stimuli to `MOSAIC/stimuli/tiff2jpg/` with the same filename stems. The DreamSim step reads these jpgs alongside `MOSAIC/stimuli/raw/`.
 
 If you are still having trouble downloading and processing the stimuli, send an email to mosaicfmri@gmail.com with subject line MOSAIC STIMULUS SET for help.
 
