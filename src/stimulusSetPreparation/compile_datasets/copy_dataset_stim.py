@@ -34,17 +34,18 @@ def main(args):
     raw_dir = os.path.join(save_root, "stimuli", "raw")
     middleframes_dir = os.path.join(save_root, "stimuli", "frames_middle")
     allframes_dir = os.path.join(save_root, "stimuli", "frames")
+    for d in [raw_dir, middleframes_dir, allframes_dir]:
+        if not os.path.exists(d):
+            os.makedirs(d)
 
     #housekeeping
     if args.dataset == 'NaturalScenesDataset':
         nsd_root = os.path.join(args.dataset_root, args.dataset, "derivatives", "stimuli_metadata")
         
         stimuli_path = os.path.join(nsd_root,"nsd_stimuli.hdf5")
-        print("loading nsd stimuli...")
         with h5py.File(stimuli_path, 'r') as hdf:
-            # Assume that images are stored under a key, e.g., 'images'
-            filepaths = hdf['imgBrick'][:]  # Load all images, rougly 39 gb in size. call the variable filepaths for compatibility with other datasets
-        assert(filepaths.shape[0] == 73000)
+            numimages = hdf['imgBrick'].shape[0]
+        assert(numimages == 73000)
         
         #load info to get nsd filenames
         nsd_csv = pd.read_csv(os.path.join(nsd_root, "nsd_stim_info_merged.csv"))
@@ -58,7 +59,7 @@ def main(args):
         print(image_data_set.keys())
         image_data = np.copy(image_data_set['imgBrick'])
         image_data_set.close()
-        for idx, source_file in tqdm(enumerate(filepaths), total=len(filepaths), desc=f"copying {args.dataset} stimuli to central dataset"):
+        for idx in tqdm(range(numimages), total=numimages, desc=f"copying {args.dataset} stimuli to central dataset"):
             if idx+1 in notshown: #notshown is 1-indexed. the idx+1 accounts for this. 
                 continue #don't add the NSD images that were not shown. account for the 1 and 0 indexing difference
             cocoID = nsd_csv.loc[idx,'cocoId']
