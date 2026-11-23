@@ -3,6 +3,9 @@
 <p align="center">
 <img src="https://github.com/blahner/mosaic-preprocessing/blob/main/assets/mosaic_logo.png" width="50%" alt="MOSAIC Logo">
 </p>
+
+UPDATES:
+- [Nov 22 2026]: Peer-review identified a sub-optimal fMRIPrep preprocessing parameter that resulted in some runs in some subjects having imperfect BOLD <--> T1 alignment. We are re-processing all subjects with this fix (along with a newer fMRIPrep version) and will release it upon publication. From what we've seen, the currently available version with misalignments is still valid but noisier than what can be obtained with the preprocessing pipeline. We recommend future studies use the updated version that will be released alongside publication. 
     
 This repository serves two purposes: (1) share the preprocessing code for the eight datasets used in the original MOSAIC [publication](https://www.biorxiv.org/content/10.64898/2025.11.28.690060v1) and (2) provide a template repository for others to preprocess their fMRI dataset to be MOSAIC-compliant. If a researcher wants to add their dataset to MOSAIC they should send an email to mosaicfmri@gmail.com. Currently, adding datasets will be done on a case-by-case basis in close coordination with the authors while we work out a more automated process. The general workflow to add a dataset to MOSAIC is detailed in this README.
 
